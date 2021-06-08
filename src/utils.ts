@@ -1,7 +1,7 @@
-import {Context} from '@actions/github/lib/context'
-import {GitHub} from '@actions/github/lib/utils'
+import { Context } from '@actions/github/lib/context'
+import { GitHub } from '@actions/github/lib/utils'
 
-import type {Args, RefRange} from './@types'
+import type { Args, RefRange } from './@types'
 
 export const issueIdRegEx = /([a-zA-Z0-9]+-[0-9]+)/g
 export async function getPreviousReleaseRef(
@@ -15,7 +15,7 @@ export async function getPreviousReleaseRef(
     ..._context.repo
   })
 
-  const {tag_name} = releases.data
+  const { tag_name } = releases.data
 
   return tag_name
 }
@@ -31,7 +31,7 @@ export function assignRefs(_context: Context, _argv: Args, octokit: InstanceType
     }
     headRef = headRef ?? _context.payload.ref ?? null
   }
-  headRef = _argv.headRef ?? headRef ?? null
-  baseRef = _argv.baseRef ?? baseRef ?? null
-  return {headRef, baseRef}
+  headRef = _argv.headRef ?? headRef ?? _context.payload.ref ?? null
+  baseRef = _argv.baseRef ?? baseRef ?? _context.payload.ref ?? null
+  return { headRef, baseRef }
 }
