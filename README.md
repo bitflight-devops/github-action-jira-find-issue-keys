@@ -36,7 +36,7 @@ This action will find the issue keys in the GitHub event and return them as a co
     # by default, to exclude tickets that may be included or fixed in other branches
     # or pull requests.
     # Default: false
-    includeMergeMessages: ''
+    include_merge_messages: ''
 
     # The Git Head Ref to which commit messages will be collected up to. If the
     # base_ref is included, and the github event is a pull_request or push, The
@@ -58,7 +58,7 @@ This action will find the issue keys in the GitHub event and return them as a co
 
     # If there is an error during transition, the action will error out.
     # Default: false
-    fail-on-error: ''
+    fail_on_error: ''
 ```
 
 <!-- end usage -->
@@ -67,19 +67,19 @@ This action will find the issue keys in the GitHub event and return them as a co
 
 <!-- start inputs -->
 
-| **Input**                  | **Description**                                                                                                                                                                           | **Default** | **Required** |
-| :------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------: | :----------: |
-| **`token`**                | The github token used for authenticating to GitHub                                                                                                                                        |             |   **true**   |
-| **`string`**               | A string to search for issues                                                                                                                                                             |             |  **false**   |
-| **`projects`**             | A comma separated list of project names to include in the results by, i.e. DEVOPS,PROJECT1                                                                                                |             |  **false**   |
-| **`projects_ignore`**      | A comma separated list of project names to exclude from the results by, i.e. INTERNAL,PROJECT2                                                                                            |             |  **false**   |
-| **`includeMergeMessages`** | When parsing commit messages, include merge and pull messages. This is disabled by default, to exclude tickets that may be included or fixed in other branches or pull requests.          |             |  **false**   |
-| **`head_ref`**             | The Git Head Ref to which commit messages will be collected up to. If the base_ref is included, and the github event is a pull_request or push, The head_ref from the event will be used. |             |  **false**   |
-| **`base_ref`**             | The Git Base Ref to which commit messages will be collected up from.                                                                                                                      |             |  **false**   |
-| **`jira_base_url`**        | The Jira cloud base url including protocol i.e. 'https://company.atlassian.net' or use environment variable JIRA_BASE_URL                                                                 |             |  **false**   |
-| **`jira_user_email`**      | The Jira cloud user email address or use environment variable JIRA_USER_EMAIL                                                                                                             |             |  **false**   |
-| **`jira_api_token`**       | The Jira cloud user api token or use environment variable JIRA_API_TOKEN                                                                                                                  |             |  **false**   |
-| **`fail-on-error`**        | If there is an error during transition, the action will error out.                                                                                                                        |             |  **false**   |
+| **Input**                    | **Description**                                                                                                                                                                           | **Default** | **Required** |
+| :--------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------: | :----------: |
+| **`token`**                  | The github token used for authenticating to GitHub                                                                                                                                        |             |   **true**   |
+| **`string`**                 | A string to search for issues                                                                                                                                                             |             |  **false**   |
+| **`projects`**               | A comma separated list of project names to include in the results by, i.e. DEVOPS,PROJECT1                                                                                                |             |  **false**   |
+| **`projects_ignore`**        | A comma separated list of project names to exclude from the results by, i.e. INTERNAL,PROJECT2                                                                                            |             |  **false**   |
+| **`include_merge_messages`** | When parsing commit messages, include merge and pull messages. This is disabled by default, to exclude tickets that may be included or fixed in other branches or pull requests.          |   `false`   |  **false**   |
+| **`head_ref`**               | The Git Head Ref to which commit messages will be collected up to. If the base_ref is included, and the github event is a pull_request or push, The head_ref from the event will be used. |             |  **false**   |
+| **`base_ref`**               | The Git Base Ref to which commit messages will be collected up from.                                                                                                                      |             |  **false**   |
+| **`jira_base_url`**          | The Jira cloud base url including protocol i.e. 'https://company.atlassian.net' or use environment variable JIRA_BASE_URL                                                                 |             |  **false**   |
+| **`jira_user_email`**        | The Jira cloud user email address or use environment variable JIRA_USER_EMAIL                                                                                                             |             |  **false**   |
+| **`jira_api_token`**         | The Jira cloud user api token or use environment variable JIRA_API_TOKEN                                                                                                                  |             |  **false**   |
+| **`fail_on_error`**          | If there is an error during transition, the action will error out.                                                                                                                        |   `false`   |  **false**   |
 
 <!-- end inputs -->
 
