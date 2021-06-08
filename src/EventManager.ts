@@ -5,10 +5,8 @@ import * as github from '@actions/github'
 import {Context} from '@actions/github/lib/context'
 import {graphql} from '@octokit/graphql'
 import {CommitHistoryConnection, GitObject, Maybe, Ref, Repository} from '@octokit/graphql-schema'
-import * as path from 'path'
 
 import {Args, RefRange} from './@types'
-import {loadFileSync} from './fs-helper'
 import Jira from './Jira'
 import {assignRefs, issueIdRegEx} from './utils'
 
@@ -30,11 +28,58 @@ interface DateRange {
   startDate: string
   endDate: string
 }
-const GetStartAndEndPoints = loadFileSync(path.resolve(__dirname, 'queries/getStartAndEndPoints.graphql'))
-// const getLastCommitMessage = loadFileSync(path.resolve(__dirname, 'queries/getLastCommitMessage.graphql'))
-const listCommitMessagesInPullRequest = loadFileSync(
-  path.resolve(__dirname, 'queries/listCommitMessagesInPullRequest.graphql')
-)
+const GetStartAndEndPoints = `
+query getStartAndEndPoints($owner: String!, $repo: String!, $headRef: String!,$baseRef: String!) {
+  repository(owner: $owner, name: $repo) {
+    endPoint: ref(qualifiedName: $headRef) {
+      ...internalBranchContent
+    }
+    startPoint: ref(qualifiedName: $baseRef) {
+      ...internalBranchContent
+    }
+  }
+}
+
+fragment internalBranchContent on Ref {
+  target {
+    ... on Commit {
+      history(first: 1) {
+        edges {
+          node {
+            committedDate
+          }
+        }
+      }
+    }
+  }
+}
+`
+const listCommitMessagesInPullRequest = `
+query listCommitMessagesInPullRequest($owner: String!, $repo: String!, $prNumber: Int!, $after: String) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $prNumber) {
+      baseRef {
+        name
+      }
+      headRef {
+        name
+      }
+      commits(first: 100, after: $after) {
+        nodes {
+          commit {
+            message
+          }
+        }
+        pageInfo {
+          startCursor
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  }
+}
+`
 
 const graphqlWithAuth = graphql.defaults({
   headers: {
