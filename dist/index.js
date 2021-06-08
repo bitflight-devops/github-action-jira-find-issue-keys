@@ -12,13 +12,61 @@ const tslib_1 = __nccwpck_require__(4351);
 const core = tslib_1.__importStar(__nccwpck_require__(42186));
 const github = tslib_1.__importStar(__nccwpck_require__(95438));
 const graphql_1 = __nccwpck_require__(88467);
-const path = tslib_1.__importStar(__nccwpck_require__(85622));
-const fs_helper_1 = __nccwpck_require__(37219);
 const utils_1 = __nccwpck_require__(50918);
 exports.token = core.getInput('token') || core.getInput('github-token') || process.env.GITHUB_TOKEN || 'NO_TOKEN';
 const octokit = github.getOctokit(exports.token);
-const GetStartAndEndPoints = fs_helper_1.loadFileSync(path.resolve(__dirname, 'queries/getStartAndEndPoints.graphql'));
-const listCommitMessagesInPullRequest = fs_helper_1.loadFileSync(path.resolve(__dirname, 'queries/listCommitMessagesInPullRequest.graphql'));
+const GetStartAndEndPoints = `
+query getStartAndEndPoints($owner: String!, $repo: String!, $headRef: String!,$baseRef: String!) {
+  repository(owner: $owner, name: $repo) {
+    endPoint: ref(qualifiedName: $headRef) {
+      ...internalBranchContent
+    }
+    startPoint: ref(qualifiedName: $baseRef) {
+      ...internalBranchContent
+    }
+  }
+}
+
+fragment internalBranchContent on Ref {
+  target {
+    ... on Commit {
+      history(first: 1) {
+        edges {
+          node {
+            committedDate
+          }
+        }
+      }
+    }
+  }
+}
+`;
+const listCommitMessagesInPullRequest = `
+query listCommitMessagesInPullRequest($owner: String!, $repo: String!, $prNumber: Int!, $after: String) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $prNumber) {
+      baseRef {
+        name
+      }
+      headRef {
+        name
+      }
+      commits(first: 100, after: $after) {
+        nodes {
+          commit {
+            message
+          }
+        }
+        pageInfo {
+          startCursor
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  }
+}
+`;
 const graphqlWithAuth = graphql_1.graphql.defaults({
     headers: {
         authorization: `token ${exports.token}`
