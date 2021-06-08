@@ -1,0 +1,173 @@
+{
+  "name": "github-action-find-issue-keys",
+  "version": "1.0.1",
+  "description": "This action will find the issue keys in the GitHub event and return them as a comma separated list",
+  "main": "dist/index.js",
+  "sideEffects": false,
+  "displayName": "bitflight-devops/github-action-find-issue-keys",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:bitflight-devops/github-action-find-issue-keys.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bitflight-devops/github-action-find-issue-keys/issues"
+  },
+  "keywords": [
+    "actions",
+    "github",
+    "node12",
+    "jira",
+    "tickets"
+  ],
+  "author": "Jamie Nelson <jamie@wearsafe.com>",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "test": "NODE_ENV=testing jest",
+    "test-ci": "NODE_ENV=testing jest --ci --reporters=default --reporters=jest-junit",
+    "clean": "rimraf dist",
+    "build": "yarn run clean;tsc;ncc build lib/index.js -o dist --source-map --license licenses.txt",
+    "format:fix": "prettier --write \"./**/*.{ts,js,json,md}\"",
+    "format": "prettier --list-different \"./**/*.{ts,js,json,md}\"",
+    "lint:fix": "yon run format:fix;eslint . --ext .js,.ts --fix",
+    "lint:markdown:fix": "yarn lint:markdown --fix",
+    "lint:markdown": "markdownlint \"**/*.md\" --config=.markdownlint.json --ignore-path=.markdownlintignore",
+    "lint": "eslint . --ext .js,.ts",
+    "all": "yon run build && yon run format && yon run lint && yon run package && yon test",
+    "stylelint-check": "stylelint-config-prettier-check",
+    "commit": "yarn run pre-commit && git-cz",
+    "pre-commit": "lint-staged && yon run build && git add dist && yarn run generate-docs",
+    "pre-push": "yarn format:fix",
+    "preversion": "echo 'Running test';yon test",
+    "version": "echo 'Run versioning commands';yon generate-docs;echo \"::set-output name=tag::v${npm_package_version}\"",
+    "postversion": "echo 'Running post versioning commands';git push --tags -f && git push && echo \"Successfully released version $npm_package_version!\"",
+    "generate-docs": "github-action-readme-generator && prettier --write .ghadocs.json README.md && git add .ghadocs.json README.md",
+    "prepare": "husky install;git config --global rebase.autosquash true",
+    "codegen": "graphql-codegen --config codegen.yml"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ],
+    "rules": {
+      "body-max-length": [
+        0
+      ],
+      "body-max-line-length": [
+        0
+      ],
+      "footer-max-length": [
+        0
+      ],
+      "footer-max-line-length": [
+        0
+      ],
+      "header-max-length": [
+        0
+      ]
+    }
+  },
+  "engines": {
+    "node": "^10.12.0 || >=12.0.0"
+  },
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "require": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "dependencies": {
+    "@actions/core": "^1.4.0",
+    "@actions/github": "^5.0.0",
+    "@octokit/graphql": "^4.6.2",
+    "@octokit/rest": "^18.5.3",
+    "ansi-colors": "^4.1.1",
+    "graphql": "^15.5.0",
+    "jira.js": "^2.2.1",
+    "lodash": "^4.17.21",
+    "tslib": "^2.2.0",
+    "yaml": "^1.10.2"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^12.1.3",
+    "@commitlint/config-conventional": "^12.1.3",
+    "@commitlint/prompt": "^12.1.3",
+    "@github/prettier-config": "^0.0.4",
+    "@octokit/graphql-schema": "^10.46.0",
+    "@tsconfig/node12": "^1.0.7",
+    "@types/jest": "^26.0.23",
+    "@types/js-yaml": "^4.0.1",
+    "@types/lodash": "^4.14.170",
+    "@types/nconf": "^0.10.0",
+    "@types/node": "^15.12.2",
+    "@types/node-fetch": "^2.5.10",
+    "@typescript-eslint/eslint-plugin": "^4.26.1",
+    "@typescript-eslint/parser": "^4.26.1",
+    "@typescript-eslint/typescript-estree": "^4.26.1",
+    "@vercel/ncc": "^0.28.5",
+    "commitizen": "^4.2.4",
+    "cz-conventional-changelog": "^3.3.0",
+    "dotenv": "^10.0.0",
+    "eslint": "^7.28.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-github": "^4.1.3",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-jest": "^24.3.6",
+    "eslint-plugin-prettier": "^3.4.0",
+    "eslint-plugin-security": "^1.4.0",
+    "eslint-plugin-simple-import-sort": "^7.0.0",
+    "github-action-readme-generator": "1.0.12",
+    "husky": "^6.0.0",
+    "jest": "^27.0.4",
+    "jest-circus": "^27.0.4",
+    "jest-junit": "^12.0.0",
+    "js-yaml": "^4.1.0",
+    "lint-staged": "^11.0.0",
+    "markdownlint-cli": "^0.27.1",
+    "prettier": "^2.3.1",
+    "rimraf": "^3.0.2",
+    "semantic-release": "^17.4.3",
+    "ts-jest": "^27.0.3",
+    "ts-node": "^10.0.0",
+    "typescript": "^4.2.4",
+    "typescript-eslint-language-service": "^4.1.4",
+    "yarn-or-npm": "^3.0.1"
+  },
+  "jest": {
+    "testPathIgnorePatterns": [
+      "/helpers/",
+      "/node_modules/"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/"
+    ]
+  },
+  "jest-junit": {
+    "suiteNameTemplate": "{filepath}",
+    "classNameTemplate": "{classname}",
+    "titleTemplate": "{title}"
+  },
+  "prettier": "@github/prettier-config",
+  "peerDependencies": {
+    "eslint": "^7.25.0"
+  },
+  "lint-staged": {
+    "{src,__tests__}/**/*.js": "eslint --cache --fix",
+    "*.ts": [
+      "eslint --cache --fix"
+    ]
+  },
+  "resolutions": {
+    "typescript": "4.2.4"
+  }
+}

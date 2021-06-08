@@ -1,0 +1,13 @@
+projects:
+  <Jira project name>:
+    ignored_states:
+      - '<job state that should be auto transitioned from 1>'
+      - '<job state that should be auto transitioned from 2>'
+    to_state:
+      <job state>:
+        - <github event name>:
+          <github event payload key 1>: '<payload key expected value>'
+        - <github event name>:
+          <github event payload key 3>: '<payload key expected value>'
+          <github event payload key 4>: '<payload key expected value>'
+

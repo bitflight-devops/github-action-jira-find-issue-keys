@@ -1,0 +1,41 @@
+projects:
+  UNICORN:
+    ignored_states:
+      - 'done'
+      - 'testing'
+    to_state:
+      'solution review':
+        - eventName: create
+      'code review':
+        - eventName: pull_request
+          action: 'opened'
+        - eventName: pull_request
+          action: 'synchronized'
+      'testing':
+        - eventName: pull_request
+          payload:
+            merged: true
+          action: 'closed'
+        - eventName: pull_request_review
+          payload:
+            state: 'APPROVED'
+  DVPS:
+    ignored_states:
+      - 'done'
+      - 'testing'
+    to_state:
+      'In Progress':
+        - eventName: create
+      'Code Review':
+        - eventName: pull_request
+          action: 'opened'
+        - eventName: pull_request
+          action: 'synchronized'
+      'testing':
+        - eventName: pull_request
+          payload:
+            merged: true
+          action: 'closed'
+        - eventName: pull_request_review
+          payload:
+            state: 'APPROVED'

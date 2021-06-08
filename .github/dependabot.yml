@@ -1,0 +1,30 @@
+version: 2
+updates:
+  # Maintain dependencies for GitHub Actions
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    assignees:
+      - jamie-bitflight
+    labels:
+      - 'github-actions'
+      - 'dependencies'
+  - package-ecosystem: 'docker'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    assignees:
+      - jamie-bitflight
+    labels:
+      - 'docker'
+      - 'dependencies'
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    assignees:
+      - jamie-bitflight
+    labels:
+      - 'npm'
+      - 'dependencies'

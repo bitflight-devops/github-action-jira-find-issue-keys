@@ -1,0 +1,75 @@
+name: Find Jira Issue Keys In GitHub Event
+description: This action will find the issue keys in the GitHub event and return them as a comma separated list
+branding:
+  icon: 'chevron-right'
+  color: 'blue'
+inputs:
+  token:
+    description: The github token used for authenticating to GitHub
+    required: true
+  string:
+    description: A string to search for issues
+    required: false
+    default: ''
+  projects:
+    description: >
+      A comma separated list of project names to include in the results by, i.e. DEVOPS,PROJECT1
+    required: false
+    default: ''
+  projects_ignore:
+    description: >
+      A comma separated list of project names to exclude from the results by, i.e. INTERNAL,PROJECT2
+    required: false
+  includeMergeMessages:
+    description: >
+      When parsing commit messages, include merge and pull messages.
+      This is disabled by default, to exclude tickets that may be included
+      or fixed in other branches or pull requests.
+    required: false
+    default: false
+  head_ref:
+    description: >
+      The Git Head Ref to which commit messages will be collected up to.
+      If the base_ref is included, and the github event is a pull_request or push,
+      The head_ref from the event will be used.
+    required: false
+  base_ref:
+    description: >
+      The Git Base Ref to which commit messages will be collected up from.
+    required: false
+  jira_base_url:
+    description: >
+      The Jira cloud base url including protocol i.e. 'https://company.atlassian.net'
+      or use environment variable JIRA_BASE_URL
+    required: false
+  jira_user_email:
+    description: >
+      The Jira cloud user email address
+      or use environment variable JIRA_USER_EMAIL
+    required: false
+  jira_api_token:
+    description: >
+      The Jira cloud user api token
+      or use environment variable JIRA_API_TOKEN
+    required: false
+  fail-on-error:
+    description: If there is an error during transition, the action will error out.
+    default: false
+    required: false
+outputs:
+  issues:
+    description: >
+      A comma separated list of all Jira Issues found
+  title_issues:
+    description: >
+      A comma separated list of Jira Issues found in the pull_request title
+  commit_issues:
+    description: >
+      A comma separated list of Jira Issues found in the commits provided
+  ref_issues:
+    description: >
+      A comma separated list of Jira Issues found in the git ref
+
+runs:
+  using: 'node12'
+  main: './dist/index.js'

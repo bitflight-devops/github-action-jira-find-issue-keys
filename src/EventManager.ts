@@ -1,0 +1,177 @@
+/* eslint-disable @typescript-eslint/prefer-for-of */
+/* eslint-disable security/detect-object-injection */
+import * as core from '@actions/core'
+import * as github from '@actions/github'
+import { Context } from '@actions/github/lib/context'
+import { graphql } from '@octokit/graphql'
+import { CommitHistoryConnection, GitObject, Maybe, Ref, Repository } from '@octokit/graphql-schema'
+import * as path from 'path'
+
+import { Args, RefRange } from './@types'
+import { loadFileSync } from './fs-helper'
+import Jira from './Jira'
+import { assignRefs, issueIdRegEx } from './utils'
+
+export const token = core.getInput('token') || core.getInput('github-token') || process.env.GITHUB_TOKEN || 'NO_TOKEN'
+
+const octokit = github.getOctokit(token)
+interface CommitHistory extends GitObject {
+  history?: Maybe<CommitHistoryConnection>
+}
+interface RefCommits extends Ref {
+  target?: Maybe<CommitHistory>
+}
+interface RepositoryDateRange extends Repository {
+  startPoint?: Maybe<RefCommits>
+  endPoint?: Maybe<RefCommits>
+}
+
+interface DateRange {
+  startDate: string
+  endDate: string
+}
+const GetStartAndEndPoints = loadFileSync(path.resolve(__dirname, 'queries/getStartAndEndPoints.graphql'))
+// const getLastCommitMessage = loadFileSync(path.resolve(__dirname, 'queries/getLastCommitMessage.graphql'))
+const listCommitMessagesInPullRequest = loadFileSync(
+  path.resolve(__dirname, 'queries/listCommitMessagesInPullRequest.graphql')
+)
+
+const graphqlWithAuth = graphql.defaults({
+  headers: {
+    authorization: `token ${token}`
+  }
+})
+
+export interface ProjectFilter {
+  projectsIncluded?: string[]
+  projectsExcluded?: string[]
+}
+
+export default class EventManager {
+  context: Context
+  filter: ProjectFilter
+  jira: Jira
+  refRange: RefRange
+  includeMergeMessages: boolean
+  failOnError = false
+  listenForEvents: string[] = []
+
+  constructor(context: Context, jira: Jira, argv: Args) {
+    this.jira = jira
+    this.context = context
+    this.failOnError = argv.failOnError
+    this.refRange = assignRefs(context, argv, octokit)
+    this.includeMergeMessages = argv.includeMergeMessages
+    this.filter = {
+      projectsIncluded: argv.projects?.split(',').map(i => i.trim().toUpperCase()),
+      projectsExcluded: argv.projectsIgnore?.split(',').map(i => i.trim().toUpperCase())
+    }
+  }
+
+  isProjectOfIssueSelected(issueKey: string): boolean {
+    const project = issueKey.split('-')[0]
+    if (!project || project.length == 0) return false
+    if (this.filter.projectsExcluded && this.filter.projectsExcluded.includes(project.toUpperCase())) {
+      return false
+    } else if (!this.filter.projectsIncluded || this.filter.projectsIncluded == []) {
+      return true
+    } else if (this.filter.projectsIncluded.includes(project.trim().toUpperCase())) {
+      return true
+    }
+    return false
+  }
+
+  getIssueSetFromString(str: string, _set: Set<string> | undefined = undefined): Set<string> {
+    const set = _set ?? new Set<string>()
+    if (str) {
+      const match = str.match(issueIdRegEx)
+
+      if (match) {
+        for (const issueKey of match) {
+          if (this.isProjectOfIssueSelected(issueKey)) {
+            set.add(issueKey)
+          }
+        }
+      }
+    }
+    return set
+  }
+
+  setToCommaDelimitedString(strSet: Set<string> | undefined): string {
+    if (strSet) {
+      return Array.from(strSet).join(',')
+    }
+    return ''
+  }
+
+  async getStartAndEndDates(range: RefRange): Promise<DateRange> {
+    const { repository } = await graphqlWithAuth<{ repository: RepositoryDateRange }>(GetStartAndEndPoints, {
+      ...this.context.repo,
+      ...range
+    })
+    const startDateList = repository?.startPoint?.target?.history?.edges
+    const startDate = startDateList ? startDateList[0]?.node?.committedDate : ''
+    const endDateList = repository?.endPoint?.target?.history?.edges
+    const endDate = endDateList ? endDateList[0]?.node?.committedDate : ''
+    return { startDate, endDate }
+  }
+
+  async getJiraKeysFromGitRange(): Promise<void> {
+    if (!(this.refRange.baseRef && this.refRange.headRef)) {
+      core.info('getJiraKeysFromGitRange: Base ref and head ref not found')
+      return
+    }
+    core.info(
+      `getJiraKeysFromGitRange: Getting list of github commits between ${this.refRange.baseRef} and ${this.refRange.headRef}`
+    )
+
+    const { title } = this.context.payload
+    const titleSet = this.getIssueSetFromString(title)
+    core.setOutput('title_issues', this.setToCommaDelimitedString(titleSet))
+    const refSet = this.getIssueSetFromString(this.refRange.headRef)
+    core.setOutput('ref_issues', this.setToCommaDelimitedString(refSet))
+
+    // const dateRange = await this.getStartAndEndDates(this.refRange)
+    const commitSet = new Set<string>()
+    let after: string | null = null
+    let hasNextPage = this.context.payload?.pull_request?.number ? true : false
+    while (hasNextPage) {
+      const { repository } = await graphqlWithAuth<{ repository: Repository }>(listCommitMessagesInPullRequest, {
+        owner: this.context.repo.owner,
+        repo: this.context.repo.repo,
+        prNumber: this.context.payload?.pull_request?.number,
+        after
+      })
+      // console.log(`date range: ${JSON.stringify(dateRange)}`)
+      console.log(JSON.stringify(repository))
+      if ((repository?.pullRequest?.commits?.totalCount as number) == 0) {
+        hasNextPage = false
+      } else {
+        hasNextPage = repository?.pullRequest?.commits?.pageInfo.hasNextPage as boolean
+        after = repository?.pullRequest?.commits?.pageInfo.endCursor as string | null
+        if (repository?.pullRequest?.commits?.nodes) {
+          for (const node of repository?.pullRequest?.commits?.nodes) {
+            if (node) {
+              let skipCommit = false
+              if (node.commit.message.startsWith('Merge branch') || node.commit.message.startsWith('Merge pull')) {
+                core.debug('Commit message indicates that it is a merge')
+                if (!this.includeMergeMessages) {
+                  skipCommit = true
+                }
+              }
+              if (skipCommit === false) {
+                this.getIssueSetFromString(node.commit.message, commitSet)
+              }
+            }
+          }
+        }
+      }
+    }
+
+    core.setOutput('commit_issues', this.setToCommaDelimitedString(commitSet))
+
+    const combinedSet = new Set<string>([...titleSet, ...refSet, ...commitSet])
+
+    core.setOutput('issues', this.setToCommaDelimitedString(combinedSet))
+  }
+}

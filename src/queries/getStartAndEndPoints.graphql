@@ -1,0 +1,24 @@
+query getStartAndEndPoints($owner: String!, $repo: String!, $headRef: String!,$baseRef: String!) {
+  repository(owner: $owner, name: $repo) {
+    endPoint: ref(qualifiedName: $headRef) {
+      ...internalBranchContent
+    }
+    startPoint: ref(qualifiedName: $baseRef) {
+      ...internalBranchContent
+    }
+  }
+}
+
+fragment internalBranchContent on Ref {
+  target {
+    ... on Commit {
+      history(first: 1) {
+        edges {
+          node {
+            committedDate
+          }
+        }
+      }
+    }
+  }
+}
