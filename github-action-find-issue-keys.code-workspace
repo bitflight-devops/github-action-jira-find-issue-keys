@@ -1,0 +1,19 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "javascript.format.semicolons": "remove",
+    "typescript.format.semicolons": "remove",
+    "typescriptHero.imports.insertSemicolons": false,
+    "typescript.preferences.quoteStyle": "single",
+    "javascript.preferences.quoteStyle": "single",
+    "vetur.format.defaultFormatterOptions": {
+      "prettier": {
+        "semi": false
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "module": "CommonJS",
+    "outDir": "out",
+    "resolveJsonModule": true,
+    "strict": true,
+    "declaration": true
+  },
+  "exclude": [
+    "node_modules",
+    "tests",
+    "out"
+  ]
+}
