@@ -1,6 +1,6 @@
 {
   "name": "github-action-find-issue-keys",
-  "version": "1.0.2",
+  "version": "1.0.0",
   "description": "This action will find the issue keys in the GitHub event and return them as a comma separated list",
   "main": "dist/index.js",
   "sideEffects": false,
