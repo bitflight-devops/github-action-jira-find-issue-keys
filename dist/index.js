@@ -136,7 +136,8 @@ class EventManager {
     }
     async getJiraKeysFromGitRange() {
         var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
-        if (!(this.refRange.baseRef && this.refRange.headRef)) {
+        core.info(`Head Ref: ${this.refRange.headRef}, Base Ref: ${this.refRange.baseRef}`);
+        if (!(this.refRange.baseRef && this.refRange.headRef) && this.context.eventName != 'pull_request') {
             core.info('getJiraKeysFromGitRange: Base ref and head ref not found');
             return;
         }
@@ -443,7 +444,7 @@ async function getPreviousReleaseRef(octo, _context) {
 }
 exports.getPreviousReleaseRef = getPreviousReleaseRef;
 function assignRefs(_context, _argv, octokit) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     let headRef, baseRef;
     if (_context.eventName === 'pull_request' && _context.payload.pull_request) {
         headRef = (_a = headRef !== null && headRef !== void 0 ? headRef : _context.payload.pull_request.head.ref) !== null && _a !== void 0 ? _a : null;
@@ -455,8 +456,8 @@ function assignRefs(_context, _argv, octokit) {
         }
         headRef = (_d = headRef !== null && headRef !== void 0 ? headRef : _context.payload.ref) !== null && _d !== void 0 ? _d : null;
     }
-    headRef = (_f = (_e = _argv.headRef) !== null && _e !== void 0 ? _e : headRef) !== null && _f !== void 0 ? _f : null;
-    baseRef = (_h = (_g = _argv.baseRef) !== null && _g !== void 0 ? _g : baseRef) !== null && _h !== void 0 ? _h : null;
+    headRef = (_g = (_f = (_e = _argv.headRef) !== null && _e !== void 0 ? _e : headRef) !== null && _f !== void 0 ? _f : _context.payload.ref) !== null && _g !== void 0 ? _g : null;
+    baseRef = (_k = (_j = (_h = _argv.baseRef) !== null && _h !== void 0 ? _h : baseRef) !== null && _j !== void 0 ? _j : _context.payload.ref) !== null && _k !== void 0 ? _k : null;
     return { headRef, baseRef };
 }
 exports.assignRefs = assignRefs;
@@ -74697,13 +74698,11 @@ var exports = __webpack_exports__;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const tslib_1 = __nccwpck_require__(4351);
 const core = tslib_1.__importStar(__nccwpck_require__(42186));
-const fs = tslib_1.__importStar(__nccwpck_require__(35747));
+const github = tslib_1.__importStar(__nccwpck_require__(95438));
 const action_1 = __nccwpck_require__(39139);
 const input_helper_1 = __nccwpck_require__(45480);
-const githubEventPath = process.env.GITHUB_EVENT_PATH;
-const githubEvent = JSON.parse(fs.readFileSync(githubEventPath, 'utf8'));
 async function exec() {
-    await new action_1.Action(githubEvent, input_helper_1.getInputs()).execute();
+    await new action_1.Action(github.context, input_helper_1.getInputs()).execute();
 }
 exec().catch(error => {
     core.setFailed(error);
