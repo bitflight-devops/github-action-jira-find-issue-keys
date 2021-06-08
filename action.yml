@@ -20,13 +20,13 @@ inputs:
     description: >
       A comma separated list of project names to exclude from the results by, i.e. INTERNAL,PROJECT2
     required: false
-  includeMergeMessages:
+  include_merge_messages:
     description: >
       When parsing commit messages, include merge and pull messages.
       This is disabled by default, to exclude tickets that may be included
       or fixed in other branches or pull requests.
     required: false
-    default: false
+    default: 'false'
   head_ref:
     description: >
       The Git Head Ref to which commit messages will be collected up to.
@@ -52,9 +52,9 @@ inputs:
       The Jira cloud user api token
       or use environment variable JIRA_API_TOKEN
     required: false
-  fail-on-error:
+  fail_on_error:
     description: If there is an error during transition, the action will error out.
-    default: false
+    default: 'false'
     required: false
 outputs:
   issues:
