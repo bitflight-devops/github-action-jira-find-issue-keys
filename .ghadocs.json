@@ -11,7 +11,7 @@
     "branch": "main"
   },
   "owner": "bitflight-devops",
-  "repo": "github-action-find-issue-keys",
+  "repo": "github-action-jira-find-issue-keys",
   "title_prefix": "GitHub Action: ",
   "pretty": "true"
 }

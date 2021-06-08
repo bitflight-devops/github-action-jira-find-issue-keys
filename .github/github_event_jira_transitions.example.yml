@@ -10,4 +10,3 @@ projects:
         - <github event name>:
           <github event payload key 3>: '<payload key expected value>'
           <github event payload key 4>: '<payload key expected value>'
-

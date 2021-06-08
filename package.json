@@ -1,16 +1,16 @@
 {
-  "name": "github-action-find-issue-keys",
-  "version": "1.0.2",
+  "name": "github-action-jira-find-issue-keys",
+  "version": "1.0.0",
   "description": "This action will find the issue keys in the GitHub event and return them as a comma separated list",
   "main": "dist/index.js",
   "sideEffects": false,
-  "displayName": "bitflight-devops/github-action-find-issue-keys",
+  "displayName": "bitflight-devops/github-action-jira-find-issue-keys",
   "repository": {
     "type": "git",
-    "url": "git@github.com:bitflight-devops/github-action-find-issue-keys.git"
+    "url": "git@github.com:bitflight-devops/github-action-jira-find-issue-keys.git"
   },
   "bugs": {
-    "url": "https://github.com/bitflight-devops/github-action-find-issue-keys/issues"
+    "url": "https://github.com/bitflight-devops/github-action-jira-find-issue-keys/issues"
   },
   "keywords": [
     "actions",
@@ -19,7 +19,7 @@
     "jira",
     "tickets"
   ],
-  "author": "Jamie Nelson <jamie@wearsafe.com>",
+  "author": "Jamie Nelson <jamie@bitflight.io>",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -36,7 +36,7 @@
     "all": "yon run build && yon run format && yon run lint && yon run package && yon test",
     "commit": "git-cz",
     "pre-commit": "lint-staged && yon run build && git add dist && yarn run generate-docs",
-    "pre-push": "yarn format:fix",
+    "pre-push": "yarn format",
     "preversion": "echo 'Running test';yon test",
     "version": "echo 'Run versioning commands';yon generate-docs;echo \"::set-output name=tag::v${npm_package_version}\"",
     "postversion": "echo 'Running post versioning commands';git push --tags -f && git push && echo \"Successfully released version $npm_package_version!\"",

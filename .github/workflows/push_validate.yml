@@ -17,4 +17,3 @@ jobs:
         uses: ./
         with:
           issue: ${{ secrets.JIRA_TEST_ISSUE_KEY }}
-
