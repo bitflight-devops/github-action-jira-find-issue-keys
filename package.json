@@ -35,6 +35,7 @@
     "lint:markdown:fix": "yarn lint:markdown --fix",
     "all": "yon run build && yon run format && yon run lint && yon run package && yon test",
     "commit": "git-cz",
+    "pre-add": "yarn format:fix",
     "pre-commit": "yarn run lint:fix && yon run build && git add dist && yarn run generate-docs",
     "pre-push": "yarn format",
     "preversion": "echo 'Running test';yon test",

@@ -74,7 +74,6 @@ const graphqlWithAuth = graphql_1.graphql.defaults({
 });
 class EventManager {
     constructor(context, jira, argv) {
-        var _a, _b;
         this.failOnError = false;
         this.listenForEvents = [];
         this.jira = jira;
@@ -84,8 +83,10 @@ class EventManager {
         this.includeMergeMessages = argv.includeMergeMessages;
         this.rawString = argv.string;
         this.filter = {
-            projectsIncluded: (_a = argv.projects) === null || _a === void 0 ? void 0 : _a.split(',').map(i => i.trim().toUpperCase()),
-            projectsExcluded: (_b = argv.projectsIgnore) === null || _b === void 0 ? void 0 : _b.split(',').map(i => i.trim().toUpperCase())
+            projectsIncluded: argv.projects && argv.projects != '' ? argv.projects.split(',').map(i => i.trim().toUpperCase()) : undefined,
+            projectsExcluded: argv.projectsIgnore && argv.projectsIgnore != ''
+                ? argv.projectsIgnore.split(',').map(i => i.trim().toUpperCase())
+                : undefined
         };
     }
     isProjectOfIssueSelected(issueKey) {

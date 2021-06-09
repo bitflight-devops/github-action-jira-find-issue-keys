@@ -110,8 +110,12 @@ export default class EventManager {
     this.includeMergeMessages = argv.includeMergeMessages
     this.rawString = argv.string
     this.filter = {
-      projectsIncluded: argv.projects?.split(',').map(i => i.trim().toUpperCase()),
-      projectsExcluded: argv.projectsIgnore?.split(',').map(i => i.trim().toUpperCase())
+      projectsIncluded:
+        argv.projects && argv.projects != '' ? argv.projects.split(',').map(i => i.trim().toUpperCase()) : undefined,
+      projectsExcluded:
+        argv.projectsIgnore && argv.projectsIgnore != ''
+          ? argv.projectsIgnore.split(',').map(i => i.trim().toUpperCase())
+          : undefined
     }
   }
 
