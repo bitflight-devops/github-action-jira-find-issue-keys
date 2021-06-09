@@ -18,6 +18,7 @@ export default class EventManager {
     includeMergeMessages: boolean;
     failOnError: boolean;
     listenForEvents: string[];
+    rawString: string;
     constructor(context: Context, jira: Jira, argv: Args);
     isProjectOfIssueSelected(issueKey: string): boolean;
     getIssueSetFromString(str: string, _set?: Set<string> | undefined): Set<string>;
