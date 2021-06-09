@@ -93,19 +93,6 @@ This action will find the issue keys in the GitHub event and return them as a co
 | `title_issues`  | A comma separated list of Jira Issues found in the pull_request title |             |              |
 | `commit_issues` | A comma separated list of Jira Issues found in the commits provided   |             |              |
 | `ref_issues`    | A comma separated list of Jira Issues found in the git ref            |             |              |
+| `string_issues` | A comma separated list of Jira Issues found in the input string       |             |              |
 
 <!-- end outputs -->
-
-The `issueOutputs` JSON structure
-
-```json
-[
-  {
-    "issue": "string",
-    "names": ["string", "array"],
-    "ids": ["string", "array"],
-    "status": "string",
-    "beforestatus": "string"
-  }
-]
-```

@@ -14,7 +14,7 @@ const gitHubWorkspace = path.resolve('/checkout-tests/workspace')
 export const baseUrl = process.env.JIRA_BASE_URL as string
 // Inputs for mock @actions/core
 let inputs = {} as any
-let [owner, repo] = (process.env.GITHUB_REPOSITORY ?? '').split('/')
+let [owner, repo] = (process.env.GITHUB_REPOSITORY || '').split('/')
 // Shallow clone original @actions/github context
 const originalContext = {...github.context}
 
@@ -56,9 +56,6 @@ describe('jira ticket transition', () => {
 
     github.context.ref = 'refs/heads/DVPS-331'
     github.context.sha = '1234567890123456789012345678901234567890'
-    github.context.payload = {
-      pull_request: {head: {ref: 'refs/heads/DVPS-331'}, base: {ref: 'refs/heads/dev'}, number: 2770, title: 'DVPS-336'}
-    }
 
     // Mock ./fs-helper directoryExistsSync()
     jest.spyOn(fsHelper, 'directoryExistsSync').mockImplementation((fspath: string) => fspath === gitHubWorkspace)
@@ -73,9 +70,7 @@ describe('jira ticket transition', () => {
     inputs.token = process.env.GITHUB_TOKEN
     inputs.include_merge_messages = 'true'
     inputs.fail_on_error = 'false'
-    inputs.ref = 'UNICORN-8403'
-    inputs.head_ref = 'refs/heads/UNICORN-8403'
-    inputs.base_ref = 'dev'
+
     inputs.jira_base_url = baseUrl
     core.info(JSON.stringify(inputs))
   })
@@ -103,7 +98,29 @@ describe('jira ticket transition', () => {
 
   it('GitHub Event: pull_request', async () => {
     // expect.hasAssertions()
+    github.context.payload = {
+      pull_request: {head: {ref: 'refs/heads/DVPS-331'}, base: {ref: 'refs/heads/dev'}, number: 2770, title: 'DVPS-336'}
+    }
     github.context.eventName = 'pull_request'
+    const settings: Args = inputHelper.getInputs()
+    const action = new Action(github.context, settings)
+    const result = await action.execute()
+    expect(result).toEqual(true)
+  })
+  it('GitHub Event: push', async () => {
+    // expect.hasAssertions()
+    github.context.eventName = 'push'
+    const settings: Args = inputHelper.getInputs()
+    const action = new Action(github.context, settings)
+    const result = await action.execute()
+    expect(result).toEqual(true)
+  })
+  it('GitHub Event: repository_dispatch', async () => {
+    // expect.hasAssertions()
+    inputs.ref = 'UNICORN-8403'
+    inputs.head_ref = 'refs/heads/UNICORN-8403'
+    inputs.base_ref = 'dev'
+    github.context.eventName = 'repository_dispatch'
     const settings: Args = inputHelper.getInputs()
     const action = new Action(github.context, settings)
     const result = await action.execute()

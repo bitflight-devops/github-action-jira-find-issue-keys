@@ -82,6 +82,7 @@ class EventManager {
         this.failOnError = argv.failOnError;
         this.refRange = utils_1.assignRefs(context, argv, octokit);
         this.includeMergeMessages = argv.includeMergeMessages;
+        this.rawString = argv.string;
         this.filter = {
             projectsIncluded: (_a = argv.projects) === null || _a === void 0 ? void 0 : _a.split(',').map(i => i.trim().toUpperCase()),
             projectsExcluded: (_b = argv.projectsIgnore) === null || _b === void 0 ? void 0 : _b.split(',').map(i => i.trim().toUpperCase())
@@ -92,18 +93,22 @@ class EventManager {
         if (!project || project.length == 0)
             return false;
         if (this.filter.projectsExcluded && this.filter.projectsExcluded.includes(project.toUpperCase())) {
+            core.debug(`${issueKey} is excluded because of a specific project filter exclusion`);
             return false;
         }
         else if (!this.filter.projectsIncluded || this.filter.projectsIncluded == []) {
+            core.debug(`${issueKey} is included because there is no specific project filter`);
             return true;
         }
         else if (this.filter.projectsIncluded.includes(project.trim().toUpperCase())) {
+            core.debug(`${issueKey} is included because there its part of the specific project filter`);
             return true;
         }
+        core.debug(`${issueKey} is excluded because it doesn't belong to the included projects`);
         return false;
     }
     getIssueSetFromString(str, _set = undefined) {
-        const set = _set !== null && _set !== void 0 ? _set : new Set();
+        const set = _set || new Set();
         if (str) {
             const match = str.match(utils_1.issueIdRegEx);
             if (match) {
@@ -135,37 +140,43 @@ class EventManager {
         return { startDate, endDate };
     }
     async getJiraKeysFromGitRange() {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
-        core.info(`Head Ref: ${this.refRange.headRef}, Base Ref: ${this.refRange.baseRef}`);
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t;
+        core.info(`EventName: ${this.context.eventName} Head Ref: ${this.refRange.headRef}, Base Ref: ${this.refRange.baseRef}`);
         if (!(this.refRange.baseRef && this.refRange.headRef) && this.context.eventName != 'pull_request') {
             core.info('getJiraKeysFromGitRange: Base ref and head ref not found');
             return;
         }
         core.info(`getJiraKeysFromGitRange: Getting list of github commits between ${this.refRange.baseRef} and ${this.refRange.headRef}`);
-        const { title } = this.context.payload;
-        const titleSet = this.getIssueSetFromString(title);
-        core.setOutput('title_issues', this.setToCommaDelimitedString(titleSet));
+        const stringSet = this.getIssueSetFromString(this.rawString);
+        if (this.rawString) {
+            core.debug(`Raw string provided is: ${this.rawString}`);
+            core.setOutput('string_issues', this.setToCommaDelimitedString(stringSet));
+        }
+        const titleSet = this.getIssueSetFromString((_b = (_a = this.context.payload) === null || _a === void 0 ? void 0 : _a.pull_request) === null || _b === void 0 ? void 0 : _b.title);
+        if (this.context.eventName == 'pull_request') {
+            core.debug(`Pull request title is: ${(_d = (_c = this.context.payload) === null || _c === void 0 ? void 0 : _c.pull_request) === null || _d === void 0 ? void 0 : _d.title}`);
+            core.setOutput('title_issues', this.setToCommaDelimitedString(titleSet));
+        }
         const refSet = this.getIssueSetFromString(this.refRange.headRef);
         core.setOutput('ref_issues', this.setToCommaDelimitedString(refSet));
         const commitSet = new Set();
         let after = null;
-        let hasNextPage = ((_b = (_a = this.context.payload) === null || _a === void 0 ? void 0 : _a.pull_request) === null || _b === void 0 ? void 0 : _b.number) ? true : false;
+        let hasNextPage = ((_f = (_e = this.context.payload) === null || _e === void 0 ? void 0 : _e.pull_request) === null || _f === void 0 ? void 0 : _f.number) ? true : false;
         while (hasNextPage) {
             const { repository } = await graphqlWithAuth(listCommitMessagesInPullRequest, {
                 owner: this.context.repo.owner,
                 repo: this.context.repo.repo,
-                prNumber: (_d = (_c = this.context.payload) === null || _c === void 0 ? void 0 : _c.pull_request) === null || _d === void 0 ? void 0 : _d.number,
+                prNumber: (_h = (_g = this.context.payload) === null || _g === void 0 ? void 0 : _g.pull_request) === null || _h === void 0 ? void 0 : _h.number,
                 after
             });
-            console.log(JSON.stringify(repository));
-            if (((_f = (_e = repository === null || repository === void 0 ? void 0 : repository.pullRequest) === null || _e === void 0 ? void 0 : _e.commits) === null || _f === void 0 ? void 0 : _f.totalCount) == 0) {
+            if (((_k = (_j = repository === null || repository === void 0 ? void 0 : repository.pullRequest) === null || _j === void 0 ? void 0 : _j.commits) === null || _k === void 0 ? void 0 : _k.totalCount) == 0) {
                 hasNextPage = false;
             }
             else {
-                hasNextPage = (_h = (_g = repository === null || repository === void 0 ? void 0 : repository.pullRequest) === null || _g === void 0 ? void 0 : _g.commits) === null || _h === void 0 ? void 0 : _h.pageInfo.hasNextPage;
-                after = (_k = (_j = repository === null || repository === void 0 ? void 0 : repository.pullRequest) === null || _j === void 0 ? void 0 : _j.commits) === null || _k === void 0 ? void 0 : _k.pageInfo.endCursor;
-                if ((_m = (_l = repository === null || repository === void 0 ? void 0 : repository.pullRequest) === null || _l === void 0 ? void 0 : _l.commits) === null || _m === void 0 ? void 0 : _m.nodes) {
-                    for (const node of (_p = (_o = repository === null || repository === void 0 ? void 0 : repository.pullRequest) === null || _o === void 0 ? void 0 : _o.commits) === null || _p === void 0 ? void 0 : _p.nodes) {
+                hasNextPage = (_m = (_l = repository === null || repository === void 0 ? void 0 : repository.pullRequest) === null || _l === void 0 ? void 0 : _l.commits) === null || _m === void 0 ? void 0 : _m.pageInfo.hasNextPage;
+                after = (_p = (_o = repository === null || repository === void 0 ? void 0 : repository.pullRequest) === null || _o === void 0 ? void 0 : _o.commits) === null || _p === void 0 ? void 0 : _p.pageInfo.endCursor;
+                if ((_r = (_q = repository === null || repository === void 0 ? void 0 : repository.pullRequest) === null || _q === void 0 ? void 0 : _q.commits) === null || _r === void 0 ? void 0 : _r.nodes) {
+                    for (const node of (_t = (_s = repository === null || repository === void 0 ? void 0 : repository.pullRequest) === null || _s === void 0 ? void 0 : _s.commits) === null || _t === void 0 ? void 0 : _t.nodes) {
                         if (node) {
                             let skipCommit = false;
                             if (node.commit.message.startsWith('Merge branch') || node.commit.message.startsWith('Merge pull')) {
@@ -183,7 +194,7 @@ class EventManager {
             }
         }
         core.setOutput('commit_issues', this.setToCommaDelimitedString(commitSet));
-        const combinedSet = new Set([...titleSet, ...refSet, ...commitSet]);
+        const combinedSet = new Set([...stringSet, ...titleSet, ...refSet, ...commitSet]);
         core.setOutput('issues', this.setToCommaDelimitedString(combinedSet));
     }
 }
@@ -216,13 +227,12 @@ class Jira {
         });
     }
     async getIssue(issueId, query) {
-        var _a, _b;
         const params = {
             issueIdOrKey: issueId
         };
         if (query != null) {
-            params.fields = (_a = query.fields) !== null && _a !== void 0 ? _a : [];
-            params.expand = (_b = query.expand) !== null && _b !== void 0 ? _b : undefined;
+            params.fields = query.fields || [];
+            params.expand = query.expand || undefined;
         }
         return await this.client.issues.getIssue(params);
     }
@@ -385,24 +395,23 @@ const core = tslib_1.__importStar(__nccwpck_require__(42186));
 const path = tslib_1.__importStar(__nccwpck_require__(85622));
 const fsHelper = tslib_1.__importStar(__nccwpck_require__(37219));
 function getInputs() {
-    var _a, _b, _c, _d, _e, _f, _g;
     const obj = {};
     const result = obj;
     const jiraConfig = obj;
-    jiraConfig.baseUrl = (_b = (_a = process.env.JIRA_BASE_URL) !== null && _a !== void 0 ? _a : core.getInput('jira_base_url')) !== null && _b !== void 0 ? _b : null;
-    if (!jiraConfig.baseUrl) {
+    jiraConfig.baseUrl = process.env.JIRA_BASE_URL || core.getInput('jira_base_url') || '';
+    if (!jiraConfig.baseUrl || jiraConfig.baseUrl === '') {
         throw new Error('JIRA_BASE_URL env not defined, or supplied as action input jira_base_url');
     }
-    jiraConfig.token = (_d = (_c = process.env.JIRA_API_TOKEN) !== null && _c !== void 0 ? _c : core.getInput('jira_api_token')) !== null && _d !== void 0 ? _d : null;
-    if (!jiraConfig.token) {
+    jiraConfig.token = process.env.JIRA_API_TOKEN || core.getInput('jira_api_token') || '';
+    if (!jiraConfig.token || jiraConfig.token === '') {
         throw new Error('JIRA_API_TOKEN env not defined, or supplied as action input jira_api_token');
     }
-    jiraConfig.email = (_f = (_e = process.env.JIRA_USER_EMAIL) !== null && _e !== void 0 ? _e : core.getInput('jira_user_email')) !== null && _f !== void 0 ? _f : null;
-    if (!jiraConfig.email) {
+    jiraConfig.email = process.env.JIRA_USER_EMAIL || core.getInput('jira_user_email') || '';
+    if (!jiraConfig.email || jiraConfig.email === '') {
         throw new Error('JIRA_USER_EMAIL env not defined, or supplied as action input jira_user_email');
     }
     result.config = jiraConfig;
-    result.token = (_g = core.getInput('token')) !== null && _g !== void 0 ? _g : process.env.GITHUB_TOKEN;
+    result.token = core.getInput('token') || process.env.GITHUB_TOKEN || '';
     result.string = core.getInput('string');
     result.baseRef = core.getInput('base_ref');
     result.headRef = core.getInput('head_ref');
@@ -444,20 +453,20 @@ async function getPreviousReleaseRef(octo, _context) {
 }
 exports.getPreviousReleaseRef = getPreviousReleaseRef;
 function assignRefs(_context, _argv, octokit) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g;
     let headRef, baseRef;
     if (_context.eventName === 'pull_request' && _context.payload.pull_request) {
-        headRef = (_a = headRef !== null && headRef !== void 0 ? headRef : _context.payload.pull_request.head.ref) !== null && _a !== void 0 ? _a : null;
-        baseRef = (_c = baseRef !== null && baseRef !== void 0 ? baseRef : (_b = _context.payload) === null || _b === void 0 ? void 0 : _b.pull_request.base.ref) !== null && _c !== void 0 ? _c : null;
+        headRef = headRef || ((_c = (_b = (_a = _context.payload) === null || _a === void 0 ? void 0 : _a.pull_request) === null || _b === void 0 ? void 0 : _b.head) === null || _c === void 0 ? void 0 : _c.ref) || null;
+        baseRef = baseRef || ((_f = (_e = (_d = _context.payload) === null || _d === void 0 ? void 0 : _d.pull_request) === null || _e === void 0 ? void 0 : _e.base) === null || _f === void 0 ? void 0 : _f.ref) || null;
     }
     else if (_context.eventName === 'push') {
-        if (_context.payload.ref.startsWith('refs/tags')) {
-            baseRef = baseRef !== null && baseRef !== void 0 ? baseRef : getPreviousReleaseRef(octokit, _context);
+        if ((_g = _context.ref) === null || _g === void 0 ? void 0 : _g.startsWith('refs/tags')) {
+            baseRef = baseRef || getPreviousReleaseRef(octokit, _context);
         }
-        headRef = (_d = headRef !== null && headRef !== void 0 ? headRef : _context.payload.ref) !== null && _d !== void 0 ? _d : null;
+        headRef = headRef || _context.ref || null;
     }
-    headRef = (_g = (_f = (_e = _argv.headRef) !== null && _e !== void 0 ? _e : headRef) !== null && _f !== void 0 ? _f : _context.payload.ref) !== null && _g !== void 0 ? _g : null;
-    baseRef = (_k = (_j = (_h = _argv.baseRef) !== null && _h !== void 0 ? _h : baseRef) !== null && _j !== void 0 ? _j : _context.payload.ref) !== null && _k !== void 0 ? _k : null;
+    headRef = _argv.headRef || headRef || _context.ref || null;
+    baseRef = _argv.baseRef || baseRef || _context.ref || null;
     return { headRef, baseRef };
 }
 exports.assignRefs = assignRefs;

@@ -37,8 +37,8 @@ export default class Jira {
       issueIdOrKey: issueId
     }
     if (query != null) {
-      params.fields = query.fields ?? []
-      params.expand = query.expand ?? undefined
+      params.fields = query.fields || []
+      params.expand = query.expand || undefined
     }
 
     return await this.client.issues.getIssue(params)

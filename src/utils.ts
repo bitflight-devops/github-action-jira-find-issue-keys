@@ -1,7 +1,7 @@
-import { Context } from '@actions/github/lib/context'
-import { GitHub } from '@actions/github/lib/utils'
+import {Context} from '@actions/github/lib/context'
+import {GitHub} from '@actions/github/lib/utils'
 
-import type { Args, RefRange } from './@types'
+import type {Args, RefRange} from './@types'
 
 export const issueIdRegEx = /([a-zA-Z0-9]+-[0-9]+)/g
 export async function getPreviousReleaseRef(
@@ -15,7 +15,7 @@ export async function getPreviousReleaseRef(
     ..._context.repo
   })
 
-  const { tag_name } = releases.data
+  const {tag_name} = releases.data
 
   return tag_name
 }
@@ -23,15 +23,15 @@ export function assignRefs(_context: Context, _argv: Args, octokit: InstanceType
   let headRef, baseRef
 
   if (_context.eventName === 'pull_request' && _context.payload.pull_request) {
-    headRef = headRef ?? _context.payload.pull_request.head.ref ?? null
-    baseRef = baseRef ?? _context.payload?.pull_request.base.ref ?? null
+    headRef = headRef || _context.payload?.pull_request?.head?.ref || null
+    baseRef = baseRef || _context.payload?.pull_request?.base?.ref || null
   } else if (_context.eventName === 'push') {
-    if (_context.payload.ref.startsWith('refs/tags')) {
-      baseRef = baseRef ?? getPreviousReleaseRef(octokit, _context)
+    if (_context.ref?.startsWith('refs/tags')) {
+      baseRef = baseRef || getPreviousReleaseRef(octokit, _context)
     }
-    headRef = headRef ?? _context.payload.ref ?? null
+    headRef = headRef || _context.ref || null
   }
-  headRef = _argv.headRef ?? headRef ?? _context.payload.ref ?? null
-  baseRef = _argv.baseRef ?? baseRef ?? _context.payload.ref ?? null
-  return { headRef, baseRef }
+  headRef = _argv.headRef || headRef || _context.ref || null
+  baseRef = _argv.baseRef || baseRef || _context.ref || null
+  return {headRef, baseRef}
 }

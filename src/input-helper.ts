@@ -9,21 +9,21 @@ export function getInputs(): Args {
   const result = obj as Args
   const jiraConfig = obj as JiraAuthConfig
 
-  jiraConfig.baseUrl = process.env.JIRA_BASE_URL ?? core.getInput('jira_base_url') ?? null
-  if (!jiraConfig.baseUrl) {
+  jiraConfig.baseUrl = process.env.JIRA_BASE_URL || core.getInput('jira_base_url') || ''
+  if (!jiraConfig.baseUrl || jiraConfig.baseUrl === '') {
     throw new Error('JIRA_BASE_URL env not defined, or supplied as action input jira_base_url')
   }
-  jiraConfig.token = process.env.JIRA_API_TOKEN ?? core.getInput('jira_api_token') ?? null
-  if (!jiraConfig.token) {
+  jiraConfig.token = process.env.JIRA_API_TOKEN || core.getInput('jira_api_token') || ''
+  if (!jiraConfig.token || jiraConfig.token === '') {
     throw new Error('JIRA_API_TOKEN env not defined, or supplied as action input jira_api_token')
   }
-  jiraConfig.email = process.env.JIRA_USER_EMAIL ?? core.getInput('jira_user_email') ?? null
-  if (!jiraConfig.email) {
+  jiraConfig.email = process.env.JIRA_USER_EMAIL || core.getInput('jira_user_email') || ''
+  if (!jiraConfig.email || jiraConfig.email === '') {
     throw new Error('JIRA_USER_EMAIL env not defined, or supplied as action input jira_user_email')
   }
 
   result.config = jiraConfig
-  result.token = core.getInput('token') ?? process.env.GITHUB_TOKEN
+  result.token = core.getInput('token') || process.env.GITHUB_TOKEN || ''
   result.string = core.getInput('string')
   result.baseRef = core.getInput('base_ref')
   result.headRef = core.getInput('head_ref')

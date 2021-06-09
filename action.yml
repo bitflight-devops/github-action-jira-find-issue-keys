@@ -69,6 +69,9 @@ outputs:
   ref_issues:
     description: >
       A comma separated list of Jira Issues found in the git ref
+  string_issues:
+    description: >
+      A comma separated list of Jira Issues found in the input string
 
 runs:
   using: 'node12'
