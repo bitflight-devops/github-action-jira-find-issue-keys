@@ -2,13 +2,13 @@
 /* eslint-disable security/detect-object-injection */
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import {Context} from '@actions/github/lib/context'
-import {graphql} from '@octokit/graphql'
-import {CommitHistoryConnection, GitObject, Maybe, Ref, Repository} from '@octokit/graphql-schema'
+import { Context } from '@actions/github/lib/context'
+import { graphql } from '@octokit/graphql'
+import { CommitHistoryConnection, GitObject, Maybe, Ref, Repository } from '@octokit/graphql-schema'
 
-import {Args, RefRange} from './@types'
+import { Args, RefRange } from './@types'
 import Jira from './Jira'
-import {assignRefs, issueIdRegEx} from './utils'
+import { assignRefs, issueIdRegEx } from './utils'
 
 export const token = core.getInput('token') || core.getInput('github-token') || process.env.GITHUB_TOKEN || 'NO_TOKEN'
 
@@ -160,7 +160,7 @@ export default class EventManager {
   }
 
   async getStartAndEndDates(range: RefRange): Promise<DateRange> {
-    const {repository} = await graphqlWithAuth<{repository: RepositoryDateRange}>(GetStartAndEndPoints, {
+    const { repository } = await graphqlWithAuth<{ repository: RepositoryDateRange }>(GetStartAndEndPoints, {
       ...this.context.repo,
       ...range
     })
@@ -168,14 +168,14 @@ export default class EventManager {
     const startDate = startDateList ? startDateList[0]?.node?.committedDate : ''
     const endDateList = repository?.endPoint?.target?.history?.edges
     const endDate = endDateList ? endDateList[0]?.node?.committedDate : ''
-    return {startDate, endDate}
+    return { startDate, endDate }
   }
 
   async getJiraKeysFromGitRange(): Promise<void> {
     core.info(
       `EventName: ${this.context.eventName} Head Ref: ${this.refRange.headRef}, Base Ref: ${this.refRange.baseRef}`
     )
-    if (!(this.refRange.baseRef && this.refRange.headRef) && this.context.eventName != 'pull_request') {
+    if (!(this.refRange.baseRef && this.refRange.headRef) && !this.context.eventName.startsWith('pull_request')) {
       core.info('getJiraKeysFromGitRange: Base ref and head ref not found')
       return
     }
@@ -188,7 +188,7 @@ export default class EventManager {
       core.setOutput('string_issues', this.setToCommaDelimitedString(stringSet))
     }
     const titleSet = this.getIssueSetFromString(this.context.payload?.pull_request?.title)
-    if (this.context.eventName == 'pull_request') {
+    if (this.context.eventName.startsWith('pull_request')) {
       core.debug(`Pull request title is: ${this.context.payload?.pull_request?.title}`)
       core.setOutput('title_issues', this.setToCommaDelimitedString(titleSet))
     }
@@ -201,7 +201,7 @@ export default class EventManager {
     let after: string | null = null
     let hasNextPage = this.context.payload?.pull_request?.number ? true : false
     while (hasNextPage) {
-      const {repository} = await graphqlWithAuth<{repository: Repository}>(listCommitMessagesInPullRequest, {
+      const { repository } = await graphqlWithAuth<{ repository: Repository }>(listCommitMessagesInPullRequest, {
         owner: this.context.repo.owner,
         repo: this.context.repo.repo,
         prNumber: this.context.payload?.pull_request?.number,
