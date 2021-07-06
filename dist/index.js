@@ -74,7 +74,6 @@ const graphqlWithAuth = graphql_1.graphql.defaults({
 });
 class EventManager {
     constructor(context, jira, argv) {
-        var _a, _b;
         this.failOnError = false;
         this.listenForEvents = [];
         this.jira = jira;
@@ -84,8 +83,10 @@ class EventManager {
         this.includeMergeMessages = argv.includeMergeMessages;
         this.rawString = argv.string;
         this.filter = {
-            projectsIncluded: (_a = argv.projects) === null || _a === void 0 ? void 0 : _a.split(',').map(i => i.trim().toUpperCase()),
-            projectsExcluded: (_b = argv.projectsIgnore) === null || _b === void 0 ? void 0 : _b.split(',').map(i => i.trim().toUpperCase())
+            projectsIncluded: argv.projects && argv.projects != '' ? argv.projects.split(',').map(i => i.trim().toUpperCase()) : undefined,
+            projectsExcluded: argv.projectsIgnore && argv.projectsIgnore != ''
+                ? argv.projectsIgnore.split(',').map(i => i.trim().toUpperCase())
+                : undefined
         };
     }
     isProjectOfIssueSelected(issueKey) {
@@ -142,7 +143,7 @@ class EventManager {
     async getJiraKeysFromGitRange() {
         var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t;
         core.info(`EventName: ${this.context.eventName} Head Ref: ${this.refRange.headRef}, Base Ref: ${this.refRange.baseRef}`);
-        if (!(this.refRange.baseRef && this.refRange.headRef) && this.context.eventName != 'pull_request') {
+        if (!(this.refRange.baseRef && this.refRange.headRef) && !this.context.eventName.startsWith('pull_request')) {
             core.info('getJiraKeysFromGitRange: Base ref and head ref not found');
             return;
         }
@@ -153,7 +154,7 @@ class EventManager {
             core.setOutput('string_issues', this.setToCommaDelimitedString(stringSet));
         }
         const titleSet = this.getIssueSetFromString((_b = (_a = this.context.payload) === null || _a === void 0 ? void 0 : _a.pull_request) === null || _b === void 0 ? void 0 : _b.title);
-        if (this.context.eventName == 'pull_request') {
+        if (this.context.eventName.startsWith('pull_request')) {
             core.debug(`Pull request title is: ${(_d = (_c = this.context.payload) === null || _c === void 0 ? void 0 : _c.pull_request) === null || _d === void 0 ? void 0 : _d.title}`);
             core.setOutput('title_issues', this.setToCommaDelimitedString(titleSet));
         }
@@ -455,7 +456,7 @@ exports.getPreviousReleaseRef = getPreviousReleaseRef;
 function assignRefs(_context, _argv, octokit) {
     var _a, _b, _c, _d, _e, _f, _g;
     let headRef, baseRef;
-    if (_context.eventName === 'pull_request' && _context.payload.pull_request) {
+    if (_context.eventName.startsWith('pull_request') && _context.payload.pull_request) {
         headRef = headRef || ((_c = (_b = (_a = _context.payload) === null || _a === void 0 ? void 0 : _a.pull_request) === null || _b === void 0 ? void 0 : _b.head) === null || _c === void 0 ? void 0 : _c.ref) || null;
         baseRef = baseRef || ((_f = (_e = (_d = _context.payload) === null || _d === void 0 ? void 0 : _d.pull_request) === null || _e === void 0 ? void 0 : _e.base) === null || _f === void 0 ? void 0 : _f.ref) || null;
     }
@@ -1843,7 +1844,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 var universalUserAgent = __nccwpck_require__(45030);
 var beforeAfterHook = __nccwpck_require__(83682);
 var request = __nccwpck_require__(36234);
-var graphql = __nccwpck_require__(88467);
+var graphql = __nccwpck_require__(76442);
 var authToken = __nccwpck_require__(40334);
 
 function _objectWithoutPropertiesLoose(source, excluded) {
@@ -2010,6 +2011,130 @@ Octokit.VERSION = VERSION;
 Octokit.plugins = [];
 
 exports.Octokit = Octokit;
+//# sourceMappingURL=index.js.map
+
+
+/***/ }),
+
+/***/ 76442:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+
+var request = __nccwpck_require__(36234);
+var universalUserAgent = __nccwpck_require__(45030);
+
+const VERSION = "4.6.2";
+
+class GraphqlError extends Error {
+  constructor(request, response) {
+    const message = response.data.errors[0].message;
+    super(message);
+    Object.assign(this, response.data);
+    Object.assign(this, {
+      headers: response.headers
+    });
+    this.name = "GraphqlError";
+    this.request = request; // Maintains proper stack trace (only available on V8)
+
+    /* istanbul ignore next */
+
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
+    }
+  }
+
+}
+
+const NON_VARIABLE_OPTIONS = ["method", "baseUrl", "url", "headers", "request", "query", "mediaType"];
+const FORBIDDEN_VARIABLE_OPTIONS = ["query", "method", "url"];
+const GHES_V3_SUFFIX_REGEX = /\/api\/v3\/?$/;
+function graphql(request, query, options) {
+  if (options) {
+    if (typeof query === "string" && "query" in options) {
+      return Promise.reject(new Error(`[@octokit/graphql] "query" cannot be used as variable name`));
+    }
+
+    for (const key in options) {
+      if (!FORBIDDEN_VARIABLE_OPTIONS.includes(key)) continue;
+      return Promise.reject(new Error(`[@octokit/graphql] "${key}" cannot be used as variable name`));
+    }
+  }
+
+  const parsedOptions = typeof query === "string" ? Object.assign({
+    query
+  }, options) : query;
+  const requestOptions = Object.keys(parsedOptions).reduce((result, key) => {
+    if (NON_VARIABLE_OPTIONS.includes(key)) {
+      result[key] = parsedOptions[key];
+      return result;
+    }
+
+    if (!result.variables) {
+      result.variables = {};
+    }
+
+    result.variables[key] = parsedOptions[key];
+    return result;
+  }, {}); // workaround for GitHub Enterprise baseUrl set with /api/v3 suffix
+  // https://github.com/octokit/auth-app.js/issues/111#issuecomment-657610451
+
+  const baseUrl = parsedOptions.baseUrl || request.endpoint.DEFAULTS.baseUrl;
+
+  if (GHES_V3_SUFFIX_REGEX.test(baseUrl)) {
+    requestOptions.url = baseUrl.replace(GHES_V3_SUFFIX_REGEX, "/api/graphql");
+  }
+
+  return request(requestOptions).then(response => {
+    if (response.data.errors) {
+      const headers = {};
+
+      for (const key of Object.keys(response.headers)) {
+        headers[key] = response.headers[key];
+      }
+
+      throw new GraphqlError(requestOptions, {
+        headers,
+        data: response.data
+      });
+    }
+
+    return response.data.data;
+  });
+}
+
+function withDefaults(request$1, newDefaults) {
+  const newRequest = request$1.defaults(newDefaults);
+
+  const newApi = (query, options) => {
+    return graphql(newRequest, query, options);
+  };
+
+  return Object.assign(newApi, {
+    defaults: withDefaults.bind(null, newRequest),
+    endpoint: request.request.endpoint
+  });
+}
+
+const graphql$1 = withDefaults(request.request, {
+  headers: {
+    "user-agent": `octokit-graphql.js/${VERSION} ${universalUserAgent.getUserAgent()}`
+  },
+  method: "POST",
+  url: "/graphql"
+});
+function withCustomRequest(customRequest) {
+  return withDefaults(customRequest, {
+    method: "POST",
+    url: "/graphql"
+  });
+}
+
+exports.graphql = graphql$1;
+exports.withCustomRequest = withCustomRequest;
 //# sourceMappingURL=index.js.map
 
 
@@ -2421,10 +2546,10 @@ exports.endpoint = endpoint;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 
-var request = __nccwpck_require__(36234);
+var request = __nccwpck_require__(63758);
 var universalUserAgent = __nccwpck_require__(45030);
 
-const VERSION = "4.6.2";
+const VERSION = "4.6.4";
 
 class GraphqlError extends Error {
   constructor(request, response) {
@@ -2532,6 +2657,273 @@ function withCustomRequest(customRequest) {
 
 exports.graphql = graphql$1;
 exports.withCustomRequest = withCustomRequest;
+//# sourceMappingURL=index.js.map
+
+
+/***/ }),
+
+/***/ 48238:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+
+function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
+
+var deprecation = __nccwpck_require__(58932);
+var once = _interopDefault(__nccwpck_require__(1223));
+
+const logOnceCode = once(deprecation => console.warn(deprecation));
+const logOnceHeaders = once(deprecation => console.warn(deprecation));
+/**
+ * Error with extra properties to help with debugging
+ */
+
+class RequestError extends Error {
+  constructor(message, statusCode, options) {
+    super(message); // Maintains proper stack trace (only available on V8)
+
+    /* istanbul ignore next */
+
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
+    }
+
+    this.name = "HttpError";
+    this.status = statusCode;
+    let headers;
+
+    if ("headers" in options && typeof options.headers !== "undefined") {
+      headers = options.headers;
+    }
+
+    if ("response" in options) {
+      this.response = options.response;
+      headers = options.response.headers;
+    } // redact request credentials without mutating original request options
+
+
+    const requestCopy = Object.assign({}, options.request);
+
+    if (options.request.headers.authorization) {
+      requestCopy.headers = Object.assign({}, options.request.headers, {
+        authorization: options.request.headers.authorization.replace(/ .*$/, " [REDACTED]")
+      });
+    }
+
+    requestCopy.url = requestCopy.url // client_id & client_secret can be passed as URL query parameters to increase rate limit
+    // see https://developer.github.com/v3/#increasing-the-unauthenticated-rate-limit-for-oauth-applications
+    .replace(/\bclient_secret=\w+/g, "client_secret=[REDACTED]") // OAuth tokens can be passed as URL query parameters, although it is not recommended
+    // see https://developer.github.com/v3/#oauth2-token-sent-in-a-header
+    .replace(/\baccess_token=\w+/g, "access_token=[REDACTED]");
+    this.request = requestCopy; // deprecations
+
+    Object.defineProperty(this, "code", {
+      get() {
+        logOnceCode(new deprecation.Deprecation("[@octokit/request-error] `error.code` is deprecated, use `error.status`."));
+        return statusCode;
+      }
+
+    });
+    Object.defineProperty(this, "headers", {
+      get() {
+        logOnceHeaders(new deprecation.Deprecation("[@octokit/request-error] `error.headers` is deprecated, use `error.response.headers`."));
+        return headers || {};
+      }
+
+    });
+  }
+
+}
+
+exports.RequestError = RequestError;
+//# sourceMappingURL=index.js.map
+
+
+/***/ }),
+
+/***/ 63758:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+
+function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
+
+var endpoint = __nccwpck_require__(59440);
+var universalUserAgent = __nccwpck_require__(45030);
+var isPlainObject = __nccwpck_require__(63287);
+var nodeFetch = _interopDefault(__nccwpck_require__(80467));
+var requestError = __nccwpck_require__(48238);
+
+const VERSION = "5.6.0";
+
+function getBufferResponse(response) {
+  return response.arrayBuffer();
+}
+
+function fetchWrapper(requestOptions) {
+  const log = requestOptions.request && requestOptions.request.log ? requestOptions.request.log : console;
+
+  if (isPlainObject.isPlainObject(requestOptions.body) || Array.isArray(requestOptions.body)) {
+    requestOptions.body = JSON.stringify(requestOptions.body);
+  }
+
+  let headers = {};
+  let status;
+  let url;
+  const fetch = requestOptions.request && requestOptions.request.fetch || nodeFetch;
+  return fetch(requestOptions.url, Object.assign({
+    method: requestOptions.method,
+    body: requestOptions.body,
+    headers: requestOptions.headers,
+    redirect: requestOptions.redirect
+  }, // `requestOptions.request.agent` type is incompatible
+  // see https://github.com/octokit/types.ts/pull/264
+  requestOptions.request)).then(async response => {
+    url = response.url;
+    status = response.status;
+
+    for (const keyAndValue of response.headers) {
+      headers[keyAndValue[0]] = keyAndValue[1];
+    }
+
+    if ("deprecation" in headers) {
+      const matches = headers.link && headers.link.match(/<([^>]+)>; rel="deprecation"/);
+      const deprecationLink = matches && matches.pop();
+      log.warn(`[@octokit/request] "${requestOptions.method} ${requestOptions.url}" is deprecated. It is scheduled to be removed on ${headers.sunset}${deprecationLink ? `. See ${deprecationLink}` : ""}`);
+    }
+
+    if (status === 204 || status === 205) {
+      return;
+    } // GitHub API returns 200 for HEAD requests
+
+
+    if (requestOptions.method === "HEAD") {
+      if (status < 400) {
+        return;
+      }
+
+      throw new requestError.RequestError(response.statusText, status, {
+        response: {
+          url,
+          status,
+          headers,
+          data: undefined
+        },
+        request: requestOptions
+      });
+    }
+
+    if (status === 304) {
+      throw new requestError.RequestError("Not modified", status, {
+        response: {
+          url,
+          status,
+          headers,
+          data: await getResponseData(response)
+        },
+        request: requestOptions
+      });
+    }
+
+    if (status >= 400) {
+      const data = await getResponseData(response);
+      const error = new requestError.RequestError(toErrorMessage(data), status, {
+        response: {
+          url,
+          status,
+          headers,
+          data
+        },
+        request: requestOptions
+      });
+      throw error;
+    }
+
+    return getResponseData(response);
+  }).then(data => {
+    return {
+      status,
+      url,
+      headers,
+      data
+    };
+  }).catch(error => {
+    if (error instanceof requestError.RequestError) throw error;
+    throw new requestError.RequestError(error.message, 500, {
+      request: requestOptions
+    });
+  });
+}
+
+async function getResponseData(response) {
+  const contentType = response.headers.get("content-type");
+
+  if (/application\/json/.test(contentType)) {
+    return response.json();
+  }
+
+  if (!contentType || /^text\/|charset=utf-8$/.test(contentType)) {
+    return response.text();
+  }
+
+  return getBufferResponse(response);
+}
+
+function toErrorMessage(data) {
+  if (typeof data === "string") return data; // istanbul ignore else - just in case
+
+  if ("message" in data) {
+    if (Array.isArray(data.errors)) {
+      return `${data.message}: ${data.errors.map(JSON.stringify).join(", ")}`;
+    }
+
+    return data.message;
+  } // istanbul ignore next - just in case
+
+
+  return `Unknown error: ${JSON.stringify(data)}`;
+}
+
+function withDefaults(oldEndpoint, newDefaults) {
+  const endpoint = oldEndpoint.defaults(newDefaults);
+
+  const newApi = function (route, parameters) {
+    const endpointOptions = endpoint.merge(route, parameters);
+
+    if (!endpointOptions.request || !endpointOptions.request.hook) {
+      return fetchWrapper(endpoint.parse(endpointOptions));
+    }
+
+    const request = (route, parameters) => {
+      return fetchWrapper(endpoint.parse(endpoint.merge(route, parameters)));
+    };
+
+    Object.assign(request, {
+      endpoint,
+      defaults: withDefaults.bind(null, endpoint)
+    });
+    return endpointOptions.request.hook(request, endpointOptions);
+  };
+
+  return Object.assign(newApi, {
+    endpoint,
+    defaults: withDefaults.bind(null, endpoint)
+  });
+}
+
+const request = withDefaults(endpoint.endpoint, {
+  headers: {
+    "user-agent": `octokit-request.js/${VERSION} ${universalUserAgent.getUserAgent()}`
+  }
+});
+
+exports.request = request;
 //# sourceMappingURL=index.js.map
 
 
@@ -13660,7 +14052,7 @@ class Backlog {
     moveIssuesToBacklog(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/agile/1.0/backlog/issue',
+                url: '/rest/agile/1.0/backlog/issue',
                 method: 'POST',
                 data: {
                     issues: parameters === null || parameters === void 0 ? void 0 : parameters.issues,
@@ -13672,7 +14064,7 @@ class Backlog {
     moveIssuesToBacklogForBoard(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/backlog/${parameters.boardId}/issue`,
+                url: `/rest/agile/1.0/backlog/${parameters.boardId}/issue`,
                 method: 'POST',
                 data: {
                     issues: parameters.issues,
@@ -13713,7 +14105,7 @@ class Board {
     getAllBoards(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/agile/1.0/board',
+                url: '/rest/agile/1.0/board',
                 method: 'GET',
                 params: {
                     startAt: parameters === null || parameters === void 0 ? void 0 : parameters.startAt,
@@ -13736,7 +14128,7 @@ class Board {
     createBoard(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/agile/1.0/board',
+                url: '/rest/agile/1.0/board',
                 method: 'POST',
                 data: {
                     name: parameters === null || parameters === void 0 ? void 0 : parameters.name,
@@ -13751,7 +14143,7 @@ class Board {
     getBoardByFilterId(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/filter/${parameters.filterId}`,
+                url: `/rest/agile/1.0/board/filter/${parameters.filterId}`,
                 method: 'GET',
                 params: {
                     startAt: parameters.startAt,
@@ -13764,7 +14156,7 @@ class Board {
     getBoard(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.board.getBoard' });
@@ -13773,7 +14165,7 @@ class Board {
     deleteBoard(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}`,
                 method: 'DELETE',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.board.deleteBoard' });
@@ -13782,7 +14174,7 @@ class Board {
     getIssuesForBacklog(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/backlog`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/backlog`,
                 method: 'GET',
                 params: {
                     startAt: parameters.startAt,
@@ -13799,7 +14191,7 @@ class Board {
     getConfiguration(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/configuration`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/configuration`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.board.getConfiguration' });
@@ -13808,7 +14200,7 @@ class Board {
     getEpics(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/epic`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/epic`,
                 method: 'GET',
                 params: {
                     startAt: parameters.startAt,
@@ -13822,7 +14214,7 @@ class Board {
     getIssuesWithoutEpicForBoard(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/epic/none/issue`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/epic/none/issue`,
                 method: 'GET',
                 params: {
                     startAt: parameters.startAt,
@@ -13839,7 +14231,7 @@ class Board {
     getBoardIssuesForEpic(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/epic/${parameters.epicId}/issue`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/epic/${parameters.epicId}/issue`,
                 method: 'GET',
                 params: {
                     startAt: parameters.startAt,
@@ -13856,7 +14248,7 @@ class Board {
     getFeaturesForBoard(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/features`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/features`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.board.getFeaturesForBoard' });
@@ -13865,7 +14257,7 @@ class Board {
     toggleFeatures(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/features`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/features`,
                 method: 'PUT',
                 data: parameters.body,
             };
@@ -13875,7 +14267,7 @@ class Board {
     getIssuesForBoard(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/issue`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/issue`,
                 method: 'GET',
                 params: {
                     startAt: parameters.startAt,
@@ -13892,7 +14284,7 @@ class Board {
     moveIssuesToBoard(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/issue`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/issue`,
                 method: 'POST',
                 data: {
                     issues: parameters.issues,
@@ -13907,7 +14299,7 @@ class Board {
     getProjects(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/project`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/project`,
                 method: 'GET',
                 params: {
                     startAt: parameters.startAt,
@@ -13920,7 +14312,7 @@ class Board {
     getProjectsFull(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/project/full`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/project/full`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.board.getProjectsFull' });
@@ -13929,7 +14321,7 @@ class Board {
     getBoardPropertyKeys(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/properties`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/properties`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.board.getBoardPropertyKeys' });
@@ -13938,7 +14330,7 @@ class Board {
     getBoardProperty(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/properties/${parameters.propertyKey}`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/properties/${parameters.propertyKey}`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.board.getBoardProperty' });
@@ -13947,7 +14339,7 @@ class Board {
     setBoardProperty(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/properties/${parameters.propertyKey}`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/properties/${parameters.propertyKey}`,
                 method: 'PUT',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.board.setBoardProperty' });
@@ -13956,7 +14348,7 @@ class Board {
     deleteBoardProperty(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/properties/${parameters.propertyKey}`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/properties/${parameters.propertyKey}`,
                 method: 'DELETE',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.board.deleteBoardProperty' });
@@ -13965,7 +14357,7 @@ class Board {
     getAllQuickFilters(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/quickfilter`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/quickfilter`,
                 method: 'GET',
                 params: {
                     startAt: parameters.startAt,
@@ -13978,7 +14370,7 @@ class Board {
     getQuickFilter(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/quickfilter/${parameters.quickFilterId}`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/quickfilter/${parameters.quickFilterId}`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.board.getQuickFilter' });
@@ -13987,7 +14379,7 @@ class Board {
     getReportsForBoard(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/reports`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/reports`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.board.getReportsForBoard' });
@@ -13996,7 +14388,7 @@ class Board {
     getAllSprints(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/sprint`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/sprint`,
                 method: 'GET',
                 params: {
                     startAt: parameters.startAt,
@@ -14010,7 +14402,7 @@ class Board {
     getBoardIssuesForSprint(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/sprint/${parameters.sprintId}/issue`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/sprint/${parameters.sprintId}/issue`,
                 method: 'GET',
                 params: {
                     startAt: parameters.startAt,
@@ -14027,7 +14419,7 @@ class Board {
     getAllVersions(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/board/${parameters.boardId}/version`,
+                url: `/rest/agile/1.0/board/${parameters.boardId}/version`,
                 method: 'GET',
                 params: {
                     startAt: parameters.startAt,
@@ -14067,7 +14459,7 @@ class Builds {
     submitBuilds(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/builds/0.1/bulk',
+                url: '/rest/builds/0.1/bulk',
                 method: 'POST',
                 data: {
                     properties: parameters === null || parameters === void 0 ? void 0 : parameters.properties,
@@ -14081,7 +14473,7 @@ class Builds {
     deleteBuildsByProperty(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/builds/0.1/bulkByProperties',
+                url: '/rest/builds/0.1/bulkByProperties',
                 method: 'DELETE',
                 params: {
                     _updateSequenceNumber: (parameters === null || parameters === void 0 ? void 0 : parameters._updateSequenceNumber) || (parameters === null || parameters === void 0 ? void 0 : parameters.updateSequenceNumber),
@@ -14093,7 +14485,7 @@ class Builds {
     getBuildByKey(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/builds/0.1/pipelines/${parameters.pipelineId}/builds/${parameters.buildNumber}`,
+                url: `/rest/builds/0.1/pipelines/${parameters.pipelineId}/builds/${parameters.buildNumber}`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.builds.getBuildByKey' });
@@ -14102,7 +14494,7 @@ class Builds {
     deleteBuildByKey(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/builds/0.1/pipelines/${parameters.pipelineId}/builds/${parameters.buildNumber}`,
+                url: `/rest/builds/0.1/pipelines/${parameters.pipelineId}/builds/${parameters.buildNumber}`,
                 method: 'DELETE',
                 params: {
                     _updateSequenceNumber: parameters._updateSequenceNumber || parameters.updateSequenceNumber,
@@ -14191,7 +14583,7 @@ class Deployments {
     submitDeployments(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/deployments/0.1/bulk',
+                url: '/rest/deployments/0.1/bulk',
                 method: 'POST',
                 data: {
                     properties: parameters === null || parameters === void 0 ? void 0 : parameters.properties,
@@ -14205,7 +14597,7 @@ class Deployments {
     deleteDeploymentsByProperty(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/deployments/0.1/bulkByProperties',
+                url: '/rest/deployments/0.1/bulkByProperties',
                 method: 'DELETE',
                 params: {
                     _updateSequenceNumber: (parameters === null || parameters === void 0 ? void 0 : parameters._updateSequenceNumber) || (parameters === null || parameters === void 0 ? void 0 : parameters.updateSequenceNumber),
@@ -14217,7 +14609,7 @@ class Deployments {
     getDeploymentByKey(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/deployments/0.1/pipelines/${parameters.pipelineId}/environments/${parameters.environmentId}/deployments/${parameters.deploymentSequenceNumber}`,
+                url: `/rest/deployments/0.1/pipelines/${parameters.pipelineId}/environments/${parameters.environmentId}/deployments/${parameters.deploymentSequenceNumber}`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.deployments.getDeploymentByKey' });
@@ -14226,7 +14618,7 @@ class Deployments {
     deleteDeploymentByKey(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/deployments/0.1/pipelines/${parameters.pipelineId}/environments/${parameters.environmentId}/deployments/${parameters.deploymentSequenceNumber}`,
+                url: `/rest/deployments/0.1/pipelines/${parameters.pipelineId}/environments/${parameters.environmentId}/deployments/${parameters.deploymentSequenceNumber}`,
                 method: 'DELETE',
                 params: {
                     _updateSequenceNumber: parameters._updateSequenceNumber || parameters.updateSequenceNumber,
@@ -14238,10 +14630,12 @@ class Deployments {
     getDeploymentGatingStatusByKey(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/deployments/0.1/pipelines/${parameters.pipelineId}/environments/${parameters.environmentId}/deployments/${parameters.deploymentSequenceNumber}/gating-status`,
+                url: `/rest/deployments/0.1/pipelines/${parameters.pipelineId}/environments/${parameters.environmentId}/deployments/${parameters.deploymentSequenceNumber}/gating-status`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'agile.deployments.getDeploymentGatingStatusByKey' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'agile.deployments.getDeploymentGatingStatusByKey',
+            });
         });
     }
 }
@@ -14273,7 +14667,7 @@ class DevelopmentInformation {
     storeDevelopmentInformation(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/devinfo/0.10/bulk',
+                url: '/rest/devinfo/0.10/bulk',
                 method: 'POST',
                 data: {
                     repositories: parameters.repositories,
@@ -14282,13 +14676,15 @@ class DevelopmentInformation {
                     providerMetadata: parameters.providerMetadata,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'agile.developmentInformation.storeDevelopmentInformation' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'agile.developmentInformation.storeDevelopmentInformation',
+            });
         });
     }
     getRepository(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/devinfo/0.10/repository/${parameters.repositoryId}`,
+                url: `/rest/devinfo/0.10/repository/${parameters.repositoryId}`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.developmentInformation.getRepository' });
@@ -14297,7 +14693,7 @@ class DevelopmentInformation {
     deleteRepository(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/devinfo/0.10/repository/${parameters.repositoryId}`,
+                url: `/rest/devinfo/0.10/repository/${parameters.repositoryId}`,
                 method: 'DELETE',
                 params: {
                     _updateSequenceId: parameters._updateSequenceId || parameters.updateSequenceId,
@@ -14309,7 +14705,7 @@ class DevelopmentInformation {
     deleteByProperties(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/devinfo/0.10/bulkByProperties',
+                url: '/rest/devinfo/0.10/bulkByProperties',
                 method: 'DELETE',
                 params: {
                     _updateSequenceId: parameters._updateSequenceId || parameters.updateSequenceId,
@@ -14321,7 +14717,7 @@ class DevelopmentInformation {
     existsByProperties(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/devinfo/0.10/existsByProperties',
+                url: '/rest/devinfo/0.10/existsByProperties',
                 method: 'GET',
                 params: {
                     _updateSequenceId: parameters._updateSequenceId || parameters.updateSequenceId,
@@ -14333,7 +14729,7 @@ class DevelopmentInformation {
     deleteEntity(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/devinfo/0.10/repository/${parameters.repositoryId}/${parameters.entityType}/${parameters.entityId}`,
+                url: `/rest/devinfo/0.10/repository/${parameters.repositoryId}/${parameters.entityType}/${parameters.entityId}`,
                 method: 'DELETE',
                 params: {
                     _updateSequenceId: parameters._updateSequenceId || parameters.updateSequenceId,
@@ -14371,7 +14767,7 @@ class Epic {
     getIssuesWithoutEpic(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/agile/1.0/epic/none/issue',
+                url: '/rest/agile/1.0/epic/none/issue',
                 method: 'GET',
                 params: {
                     startAt: parameters === null || parameters === void 0 ? void 0 : parameters.startAt,
@@ -14388,7 +14784,7 @@ class Epic {
     removeIssuesFromEpic(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/agile/1.0/epic/none/issue',
+                url: '/rest/agile/1.0/epic/none/issue',
                 method: 'POST',
                 data: {
                     issues: parameters === null || parameters === void 0 ? void 0 : parameters.issues,
@@ -14400,7 +14796,7 @@ class Epic {
     searchEpics(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/agile/1.0/epic/search',
+                url: '/rest/agile/1.0/epic/search',
                 method: 'GET',
                 params: {
                     maxResults: parameters === null || parameters === void 0 ? void 0 : parameters.maxResults,
@@ -14415,7 +14811,7 @@ class Epic {
     getEpic(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/epic/${parameters.epicIdOrKey}`,
+                url: `/rest/agile/1.0/epic/${parameters.epicIdOrKey}`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.epic.getEpic' });
@@ -14424,7 +14820,7 @@ class Epic {
     partiallyUpdateEpic(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/epic/${parameters.epicIdOrKey}`,
+                url: `/rest/agile/1.0/epic/${parameters.epicIdOrKey}`,
                 method: 'POST',
                 data: {
                     name: parameters.name,
@@ -14439,7 +14835,7 @@ class Epic {
     getIssuesForEpic(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/epic/${parameters.epicIdOrKey}/issue`,
+                url: `/rest/agile/1.0/epic/${parameters.epicIdOrKey}/issue`,
                 method: 'GET',
                 params: {
                     startAt: parameters.startAt,
@@ -14456,7 +14852,7 @@ class Epic {
     moveIssuesToEpic(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/epic/${parameters.epicIdOrKey}/issue`,
+                url: `/rest/agile/1.0/epic/${parameters.epicIdOrKey}/issue`,
                 method: 'POST',
                 data: {
                     issues: parameters.issues,
@@ -14468,7 +14864,7 @@ class Epic {
     rankEpics(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/epic/${parameters.epicIdOrKey}/rank`,
+                url: `/rest/agile/1.0/epic/${parameters.epicIdOrKey}/rank`,
                 method: 'PUT',
                 data: {
                     rankBeforeEpic: parameters.rankBeforeEpic,
@@ -14508,7 +14904,7 @@ class FeatureFlags {
     submitFeatureFlags(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/featureflags/0.1/bulk',
+                url: '/rest/featureflags/0.1/bulk',
                 method: 'POST',
                 data: {
                     properties: parameters === null || parameters === void 0 ? void 0 : parameters.properties,
@@ -14522,7 +14918,7 @@ class FeatureFlags {
     deleteFeatureFlagsByProperty(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/featureflags/0.1/bulkByProperties',
+                url: '/rest/featureflags/0.1/bulkByProperties',
                 method: 'DELETE',
                 params: {
                     _updateSequenceId: (parameters === null || parameters === void 0 ? void 0 : parameters._updateSequenceId) || (parameters === null || parameters === void 0 ? void 0 : parameters.updateSequenceId),
@@ -14534,7 +14930,7 @@ class FeatureFlags {
     getFeatureFlagById(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/featureflags/0.1/flag/${parameters.featureFlagId}`,
+                url: `/rest/featureflags/0.1/flag/${parameters.featureFlagId}`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.featureFlags.getFeatureFlagById' });
@@ -14543,7 +14939,7 @@ class FeatureFlags {
     deleteFeatureFlagById(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/featureflags/0.1/flag/${parameters.featureFlagId}`,
+                url: `/rest/featureflags/0.1/flag/${parameters.featureFlagId}`,
                 method: 'DELETE',
                 params: {
                     _updateSequenceId: parameters._updateSequenceId || parameters.updateSequenceId,
@@ -14616,7 +15012,7 @@ class Issue {
     rankIssues(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/agile/1.0/issue/rank',
+                url: '/rest/agile/1.0/issue/rank',
                 method: 'PUT',
                 data: {
                     issues: parameters === null || parameters === void 0 ? void 0 : parameters.issues,
@@ -14631,7 +15027,7 @@ class Issue {
     getIssue(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/issue/${parameters.issueIdOrKey}`,
+                url: `/rest/agile/1.0/issue/${parameters.issueIdOrKey}`,
                 method: 'GET',
                 params: {
                     fields: parameters.fields,
@@ -14645,7 +15041,7 @@ class Issue {
     getIssueEstimationForBoard(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/issue/${parameters.issueIdOrKey}/estimation`,
+                url: `/rest/agile/1.0/issue/${parameters.issueIdOrKey}/estimation`,
                 method: 'GET',
                 params: {
                     boardId: parameters.boardId,
@@ -14657,7 +15053,7 @@ class Issue {
     estimateIssueForBoard(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/issue/${parameters.issueIdOrKey}/estimation`,
+                url: `/rest/agile/1.0/issue/${parameters.issueIdOrKey}/estimation`,
                 method: 'PUT',
                 params: {
                     boardId: parameters.boardId,
@@ -15219,7 +15615,7 @@ __exportStar(__nccwpck_require__(45792), exports);
 __exportStar(__nccwpck_require__(72870), exports);
 __exportStar(__nccwpck_require__(92741), exports);
 __exportStar(__nccwpck_require__(90041), exports);
-__exportStar(__nccwpck_require__(69960), exports);
+__exportStar(__nccwpck_require__(15225), exports);
 __exportStar(__nccwpck_require__(95147), exports);
 __exportStar(__nccwpck_require__(3448), exports);
 __exportStar(__nccwpck_require__(43753), exports);
@@ -15458,13 +15854,23 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 /***/ }),
 
-/***/ 69960:
+/***/ 15225:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-//# sourceMappingURL=sprintBean.js.map
+exports.Sprint = void 0;
+var Sprint;
+(function (Sprint) {
+    let State;
+    (function (State) {
+        State["Future"] = "future";
+        State["Active"] = "active";
+        State["Closed"] = "closed";
+    })(State = Sprint.State || (Sprint.State = {}));
+})(Sprint = exports.Sprint || (exports.Sprint = {}));
+//# sourceMappingURL=sprint.js.map
 
 /***/ }),
 
@@ -16487,7 +16893,7 @@ class Project {
     getFeaturesForProject(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/project/${parameters.projectIdOrKey}/features`,
+                url: `/rest/agile/1.0/project/${parameters.projectIdOrKey}/features`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.project.getFeaturesForProject' });
@@ -16522,7 +16928,7 @@ class RemoteLinks {
     submitRemoteLinks(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/remotelinks/1.0/bulk',
+                url: '/rest/remotelinks/1.0/bulk',
                 method: 'POST',
                 data: {
                     properties: parameters === null || parameters === void 0 ? void 0 : parameters.properties,
@@ -16536,7 +16942,7 @@ class RemoteLinks {
     deleteRemoteLinksByProperty(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/remotelinks/1.0/bulkByProperties',
+                url: '/rest/remotelinks/1.0/bulkByProperties',
                 method: 'DELETE',
                 params: {
                     _updateSequenceNumber: (parameters === null || parameters === void 0 ? void 0 : parameters._updateSequenceNumber) || (parameters === null || parameters === void 0 ? void 0 : parameters.updateSequenceNumber),
@@ -16549,7 +16955,7 @@ class RemoteLinks {
     getRemoteLinkById(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/remotelinks/1.0/remotelink/${parameters.remoteLinkId}`,
+                url: `/rest/remotelinks/1.0/remotelink/${parameters.remoteLinkId}`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.remoteLinks.getRemoteLinkById' });
@@ -16558,7 +16964,7 @@ class RemoteLinks {
     deleteRemoteLinkById(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/remotelinks/1.0/remotelink/${parameters.remoteLinkId}`,
+                url: `/rest/remotelinks/1.0/remotelink/${parameters.remoteLinkId}`,
                 method: 'DELETE',
                 params: {
                     _updateSequenceNumber: parameters._updateSequenceNumber || parameters.updateSequenceNumber,
@@ -16596,7 +17002,7 @@ class Sprint {
     createSprint(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: '/agile/1.0/sprint',
+                url: '/rest/agile/1.0/sprint',
                 method: 'POST',
                 data: {
                     name: parameters === null || parameters === void 0 ? void 0 : parameters.name,
@@ -16612,7 +17018,7 @@ class Sprint {
     getSprint(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/sprint/${parameters.sprintId}`,
+                url: `/rest/agile/1.0/sprint/${parameters.sprintId}`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.sprint.getSprint' });
@@ -16621,7 +17027,7 @@ class Sprint {
     partiallyUpdateSprint(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/sprint/${parameters.sprintId}`,
+                url: `/rest/agile/1.0/sprint/${parameters.sprintId}`,
                 method: 'POST',
                 data: {
                     id: parameters.id,
@@ -16641,7 +17047,7 @@ class Sprint {
     updateSprint(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/sprint/${parameters.sprintId}`,
+                url: `/rest/agile/1.0/sprint/${parameters.sprintId}`,
                 method: 'PUT',
                 data: {
                     id: parameters.id,
@@ -16661,7 +17067,7 @@ class Sprint {
     deleteSprint(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/sprint/${parameters.sprintId}`,
+                url: `/rest/agile/1.0/sprint/${parameters.sprintId}`,
                 method: 'DELETE',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.sprint.deleteSprint' });
@@ -16670,7 +17076,7 @@ class Sprint {
     getIssuesForSprint(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/sprint/${parameters.sprintId}/issue`,
+                url: `/rest/agile/1.0/sprint/${parameters.sprintId}/issue`,
                 method: 'GET',
                 params: {
                     startAt: parameters.startAt,
@@ -16687,7 +17093,7 @@ class Sprint {
     moveIssuesToSprintAndRank(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/sprint/${parameters.sprintId}/issue`,
+                url: `/rest/agile/1.0/sprint/${parameters.sprintId}/issue`,
                 method: 'POST',
                 data: {
                     issues: parameters.issues,
@@ -16702,7 +17108,7 @@ class Sprint {
     getPropertiesKeys(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/sprint/${parameters.sprintId}/properties`,
+                url: `/rest/agile/1.0/sprint/${parameters.sprintId}/properties`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.sprint.getPropertiesKeys' });
@@ -16711,7 +17117,7 @@ class Sprint {
     getProperty(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/sprint/${parameters.sprintId}/properties/${parameters.propertyKey}`,
+                url: `/rest/agile/1.0/sprint/${parameters.sprintId}/properties/${parameters.propertyKey}`,
                 method: 'GET',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.sprint.getProperty' });
@@ -16720,7 +17126,7 @@ class Sprint {
     setProperty(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/sprint/${parameters.sprintId}/properties/${parameters.propertyKey}`,
+                url: `/rest/agile/1.0/sprint/${parameters.sprintId}/properties/${parameters.propertyKey}`,
                 method: 'PUT',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.sprint.setProperty' });
@@ -16729,7 +17135,7 @@ class Sprint {
     deleteProperty(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/sprint/${parameters.sprintId}/properties/${parameters.propertyKey}`,
+                url: `/rest/agile/1.0/sprint/${parameters.sprintId}/properties/${parameters.propertyKey}`,
                 method: 'DELETE',
             };
             return this.client.sendRequest(config, callback, { methodName: 'agile.sprint.deleteProperty' });
@@ -16738,7 +17144,7 @@ class Sprint {
     swapSprint(parameters, callback) {
         return __awaiter(this, void 0, void 0, function* () {
             const config = {
-                url: `/agile/1.0/sprint/${parameters.sprintId}/swap`,
+                url: `/rest/agile/1.0/sprint/${parameters.sprintId}/swap`,
                 method: 'POST',
                 data: {
                     sprintToSwapWith: parameters.sprintToSwapWith,
@@ -16833,7 +17239,7 @@ class BaseClient {
         var _a, _b, _c, _d, _e, _f, _g, _h;
         return __awaiter(this, void 0, void 0, function* () {
             const startDateTime = new Date();
-            const telemetry = Object.assign({ authentication: this.authenticationType, baseRequestConfigUsed: !!this.config.baseRequestConfig, bodyExists: !!requestConfig.data, callbackUsed: !!callback, headersExists: !!requestConfig.headers, libVersion: '2.3.0', libVersionHash: 'ae14c21d807ec17e583ca3b6c2097de5', methodName: (telemetryData === null || telemetryData === void 0 ? void 0 : telemetryData.methodName) || 'sendRequest', onErrorMiddlewareUsed: !!((_a = this.config.middlewares) === null || _a === void 0 ? void 0 : _a.onError), onResponseMiddlewareUsed: !!((_b = this.config.middlewares) === null || _b === void 0 ? void 0 : _b.onResponse), queryExists: !!requestConfig.params, requestEndTime: new Date(), requestStartTime: startDateTime, requestStatusCode: 0, strict_GDPR_enabled: !!this.config.strictGDPR, noCheckAtlassianToken: !!this.config.noCheckAtlassianToken }, telemetryData);
+            const telemetry = Object.assign({ authentication: this.authenticationType, baseRequestConfigUsed: !!this.config.baseRequestConfig, bodyExists: !!requestConfig.data, callbackUsed: !!callback, headersExists: !!requestConfig.headers, libVersion: '2.4.1', libVersionHash: '86bc3115eb4e9873ac96904a4a68e19e', methodName: (telemetryData === null || telemetryData === void 0 ? void 0 : telemetryData.methodName) || 'sendRequest', onErrorMiddlewareUsed: !!((_a = this.config.middlewares) === null || _a === void 0 ? void 0 : _a.onError), onResponseMiddlewareUsed: !!((_b = this.config.middlewares) === null || _b === void 0 ? void 0 : _b.onResponse), queryExists: !!requestConfig.params, requestEndTime: new Date(), requestStartTime: startDateTime, requestStatusCode: 0, strict_GDPR_enabled: !!this.config.strictGDPR, noCheckAtlassianToken: !!this.config.noCheckAtlassianToken }, telemetryData);
             try {
                 const modifiedRequestConfig = Object.assign(Object.assign({}, requestConfig), { headers: this.removeUndefinedProperties(Object.assign({ Authorization: yield authenticationService_1.AuthenticationService.getAuthenticationToken(this.config.authentication, {
                             baseURL: this.config.host,
@@ -17362,7 +17768,9 @@ class ApplicationRoles {
                 url: '/rest/api/2/applicationrole',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.applicationRoles.getAllApplicationRoles' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.applicationRoles.getAllApplicationRoles',
+            });
         });
     }
     getApplicationRole(parameters, callback) {
@@ -17536,6 +17944,7 @@ class Version2Client extends clients_1.BaseClient {
         this.issueAttachments = new __1.IssueAttachments(this);
         this.issueCommentProperties = new __1.IssueCommentProperties(this);
         this.issueComments = new __1.IssueComments(this);
+        this.issueCustomFieldConfigurationApps = new __1.IssueCustomFieldConfigurationApps(this);
         this.issueCustomFieldContexts = new __1.IssueCustomFieldContexts(this);
         this.issueCustomFieldOptions = new __1.IssueCustomFieldOptions(this);
         this.issueCustomFieldOptionsApps = new __1.IssueCustomFieldOptionsApps(this);
@@ -17682,7 +18091,9 @@ class Dashboards {
                 url: `/rest/api/2/dashboard/${parameters.dashboardId}/items/${parameters.itemId}/properties`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.dashboards.getDashboardItemPropertyKeys' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.dashboards.getDashboardItemPropertyKeys',
+            });
         });
     }
     getDashboardItemProperty(parameters, callback) {
@@ -18329,6 +18740,7 @@ __exportStar(__nccwpck_require__(77584), exports);
 __exportStar(__nccwpck_require__(62539), exports);
 __exportStar(__nccwpck_require__(50448), exports);
 __exportStar(__nccwpck_require__(70384), exports);
+__exportStar(__nccwpck_require__(36854), exports);
 __exportStar(__nccwpck_require__(83397), exports);
 __exportStar(__nccwpck_require__(80412), exports);
 __exportStar(__nccwpck_require__(19890), exports);
@@ -18490,7 +18902,9 @@ class IssueAttachments {
                 url: `/rest/api/2/attachment/${parameters.id}/expand/human`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueAttachments.expandAttachmentForHumans' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueAttachments.expandAttachmentForHumans',
+            });
         });
     }
     expandAttachmentForMachines(parameters, callback) {
@@ -18499,7 +18913,9 @@ class IssueAttachments {
                 url: `/rest/api/2/attachment/${parameters.id}/expand/raw`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueAttachments.expandAttachmentForMachines' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueAttachments.expandAttachmentForMachines',
+            });
         });
     }
     addAttachment(parameters, callback) {
@@ -18549,7 +18965,9 @@ class IssueCommentProperties {
                 url: `/rest/api/2/comment/${parameters.commentId}/properties`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCommentProperties.getCommentPropertyKeys' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCommentProperties.getCommentPropertyKeys',
+            });
         });
     }
     getCommentProperty(parameters, callback) {
@@ -18558,7 +18976,9 @@ class IssueCommentProperties {
                 url: `/rest/api/2/comment/${parameters.commentId}/properties/${parameters.propertyKey}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCommentProperties.getCommentProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCommentProperties.getCommentProperty',
+            });
         });
     }
     setCommentProperty(parameters, callback) {
@@ -18567,7 +18987,9 @@ class IssueCommentProperties {
                 url: `/rest/api/2/comment/${parameters.commentId}/properties/${parameters.propertyKey}`,
                 method: 'PUT',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCommentProperties.setCommentProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCommentProperties.setCommentProperty',
+            });
         });
     }
     deleteCommentProperty(parameters, callback) {
@@ -18576,7 +18998,9 @@ class IssueCommentProperties {
                 url: `/rest/api/2/comment/${parameters.commentId}/properties/${parameters.propertyKey}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCommentProperties.deleteCommentProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCommentProperties.deleteCommentProperty',
+            });
         });
     }
 }
@@ -18700,6 +19124,63 @@ exports.IssueComments = IssueComments;
 
 /***/ }),
 
+/***/ 36854:
+/***/ (function(__unused_webpack_module, exports) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.IssueCustomFieldConfigurationApps = void 0;
+class IssueCustomFieldConfigurationApps {
+    constructor(client) {
+        this.client = client;
+    }
+    getCustomFieldConfiguration(parameters, callback) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const config = {
+                url: `/rest/api/2/app/field/${parameters.fieldIdOrKey}/context/configuration`,
+                method: 'GET',
+                params: {
+                    contextId: parameters.contextId,
+                    issueId: parameters.issueId,
+                    startAt: parameters.startAt,
+                    maxResults: parameters.maxResults,
+                },
+            };
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldConfigurationApps.getCustomFieldConfiguration',
+            });
+        });
+    }
+    updateCustomFieldConfiguration(parameters, callback) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const config = {
+                url: `/rest/api/2/app/field/${parameters.fieldIdOrKey}/context/configuration`,
+                method: 'PUT',
+                data: {
+                    configurations: parameters.configurations,
+                },
+            };
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldConfigurationApps.updateCustomFieldConfiguration',
+            });
+        });
+    }
+}
+exports.IssueCustomFieldConfigurationApps = IssueCustomFieldConfigurationApps;
+//# sourceMappingURL=issueCustomFieldConfigurationApps.js.map
+
+/***/ }),
+
 /***/ 83397:
 /***/ (function(__unused_webpack_module, exports) {
 
@@ -18733,7 +19214,9 @@ class IssueCustomFieldContexts {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldContexts.getContextsForField' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldContexts.getContextsForField',
+            });
         });
     }
     createCustomFieldContext(parameters, callback) {
@@ -18749,7 +19232,9 @@ class IssueCustomFieldContexts {
                     issueTypeIds: parameters.issueTypeIds,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldContexts.createCustomFieldContext' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldContexts.createCustomFieldContext',
+            });
         });
     }
     getDefaultValues(parameters, callback) {
@@ -18763,7 +19248,9 @@ class IssueCustomFieldContexts {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldContexts.getDefaultValues' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldContexts.getDefaultValues',
+            });
         });
     }
     setDefaultValues(parameters, callback) {
@@ -18775,7 +19262,9 @@ class IssueCustomFieldContexts {
                     defaultValues: parameters.defaultValues,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldContexts.setDefaultValues' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldContexts.setDefaultValues',
+            });
         });
     }
     getIssueTypeMappingsForContexts(parameters, callback) {
@@ -18789,7 +19278,9 @@ class IssueCustomFieldContexts {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldContexts.getIssueTypeMappingsForContexts' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldContexts.getIssueTypeMappingsForContexts',
+            });
         });
     }
     getCustomFieldContextsForProjectsAndIssueTypes(parameters, callback) {
@@ -18805,7 +19296,9 @@ class IssueCustomFieldContexts {
                     mappings: parameters.mappings,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldContexts.getCustomFieldContextsForProjectsAndIssueTypes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldContexts.getCustomFieldContextsForProjectsAndIssueTypes',
+            });
         });
     }
     getProjectContextMapping(parameters, callback) {
@@ -18819,7 +19312,9 @@ class IssueCustomFieldContexts {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldContexts.getProjectContextMapping' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldContexts.getProjectContextMapping',
+            });
         });
     }
     updateCustomFieldContext(parameters, callback) {
@@ -18832,7 +19327,9 @@ class IssueCustomFieldContexts {
                     description: parameters.description,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldContexts.updateCustomFieldContext' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldContexts.updateCustomFieldContext',
+            });
         });
     }
     deleteCustomFieldContext(parameters, callback) {
@@ -18841,7 +19338,9 @@ class IssueCustomFieldContexts {
                 url: `/rest/api/2/field/${parameters.fieldId}/context/${parameters.contextId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldContexts.deleteCustomFieldContext' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldContexts.deleteCustomFieldContext',
+            });
         });
     }
     addIssueTypesToContext(parameters, callback) {
@@ -18853,7 +19352,9 @@ class IssueCustomFieldContexts {
                     issueTypeIds: parameters.issueTypeIds,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldContexts.addIssueTypesToContext' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldContexts.addIssueTypesToContext',
+            });
         });
     }
     removeIssueTypesFromContext(parameters, callback) {
@@ -18865,7 +19366,9 @@ class IssueCustomFieldContexts {
                     issueTypeIds: parameters.issueTypeIds,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldContexts.removeIssueTypesFromContext' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldContexts.removeIssueTypesFromContext',
+            });
         });
     }
     assignProjectsToCustomFieldContext(parameters, callback) {
@@ -18877,7 +19380,9 @@ class IssueCustomFieldContexts {
                     projectIds: parameters.projectIds,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldContexts.assignProjectsToCustomFieldContext' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldContexts.assignProjectsToCustomFieldContext',
+            });
         });
     }
     removeCustomFieldContextFromProjects(parameters, callback) {
@@ -18889,7 +19394,9 @@ class IssueCustomFieldContexts {
                     projectIds: parameters.projectIds,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldContexts.removeCustomFieldContextFromProjects' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldContexts.removeCustomFieldContextFromProjects',
+            });
         });
     }
 }
@@ -18928,7 +19435,9 @@ class IssueCustomFieldOptions {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptions.getOptionsForField' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptions.getOptionsForField',
+            });
         });
     }
     createCustomFieldOptions(parameters, callback) {
@@ -18940,7 +19449,9 @@ class IssueCustomFieldOptions {
                     options: parameters.options,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptions.createCustomFieldOptions' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptions.createCustomFieldOptions',
+            });
         });
     }
     updateCustomFieldOptions(parameters, callback) {
@@ -18952,7 +19463,9 @@ class IssueCustomFieldOptions {
                     options: parameters.options,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptions.updateCustomFieldOptions' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptions.updateCustomFieldOptions',
+            });
         });
     }
     getCustomFieldOption(parameters, callback) {
@@ -18961,7 +19474,9 @@ class IssueCustomFieldOptions {
                 url: `/rest/api/2/customFieldOption/${parameters.id}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptions.getCustomFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptions.getCustomFieldOption',
+            });
         });
     }
     getOptionsForContext(parameters, callback) {
@@ -18976,7 +19491,9 @@ class IssueCustomFieldOptions {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptions.getOptionsForContext' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptions.getOptionsForContext',
+            });
         });
     }
     createCustomFieldOption(parameters, callback) {
@@ -18988,7 +19505,9 @@ class IssueCustomFieldOptions {
                     options: parameters.options,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptions.createCustomFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptions.createCustomFieldOption',
+            });
         });
     }
     updateCustomFieldOption(parameters, callback) {
@@ -19000,7 +19519,9 @@ class IssueCustomFieldOptions {
                     options: parameters.options,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptions.updateCustomFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptions.updateCustomFieldOption',
+            });
         });
     }
     reorderCustomFieldOptions(parameters, callback) {
@@ -19014,7 +19535,9 @@ class IssueCustomFieldOptions {
                     position: parameters.position,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptions.reorderCustomFieldOptions' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptions.reorderCustomFieldOptions',
+            });
         });
     }
     deleteCustomFieldOption(parameters, callback) {
@@ -19023,7 +19546,9 @@ class IssueCustomFieldOptions {
                 url: `/rest/api/2/field/${parameters.fieldId}/context/${parameters.contextId}/option/${parameters.optionId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptions.deleteCustomFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptions.deleteCustomFieldOption',
+            });
         });
     }
 }
@@ -19062,7 +19587,9 @@ class IssueCustomFieldOptionsApps {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptionsApps.getAllIssueFieldOptions' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptionsApps.getAllIssueFieldOptions',
+            });
         });
     }
     createIssueFieldOption(parameters, callback) {
@@ -19076,7 +19603,9 @@ class IssueCustomFieldOptionsApps {
                     config: parameters.config,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptionsApps.createIssueFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptionsApps.createIssueFieldOption',
+            });
         });
     }
     getSelectableIssueFieldOptions(parameters, callback) {
@@ -19090,7 +19619,9 @@ class IssueCustomFieldOptionsApps {
                     projectId: parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptionsApps.getSelectableIssueFieldOptions' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptionsApps.getSelectableIssueFieldOptions',
+            });
         });
     }
     getVisibleIssueFieldOptions(parameters, callback) {
@@ -19104,7 +19635,9 @@ class IssueCustomFieldOptionsApps {
                     projectId: parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptionsApps.getVisibleIssueFieldOptions' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptionsApps.getVisibleIssueFieldOptions',
+            });
         });
     }
     getIssueFieldOption(parameters, callback) {
@@ -19113,7 +19646,9 @@ class IssueCustomFieldOptionsApps {
                 url: `/rest/api/2/field/${parameters.fieldKey}/option/${parameters.optionId}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptionsApps.getIssueFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptionsApps.getIssueFieldOption',
+            });
         });
     }
     updateIssueFieldOption(parameters, callback) {
@@ -19128,7 +19663,9 @@ class IssueCustomFieldOptionsApps {
                     config: parameters.config,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptionsApps.updateIssueFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptionsApps.updateIssueFieldOption',
+            });
         });
     }
     deleteIssueFieldOption(parameters, callback) {
@@ -19137,7 +19674,9 @@ class IssueCustomFieldOptionsApps {
                 url: `/rest/api/2/field/${parameters.fieldKey}/option/${parameters.optionId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptionsApps.deleteIssueFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptionsApps.deleteIssueFieldOption',
+            });
         });
     }
     replaceIssueFieldOption(parameters, callback) {
@@ -19150,7 +19689,9 @@ class IssueCustomFieldOptionsApps {
                     jql: parameters.jql,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldOptionsApps.replaceIssueFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldOptionsApps.replaceIssueFieldOption',
+            });
         });
     }
 }
@@ -19188,7 +19729,9 @@ class IssueCustomFieldValuesApps {
                     updates: parameters.updates,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueCustomFieldValuesApps.updateCustomFieldValue' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueCustomFieldValuesApps.updateCustomFieldValue',
+            });
         });
     }
 }
@@ -19230,7 +19773,9 @@ class IssueFieldConfigurations {
                     query: parameters === null || parameters === void 0 ? void 0 : parameters.query,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueFieldConfigurations.getAllFieldConfigurations' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueFieldConfigurations.getAllFieldConfigurations',
+            });
         });
     }
     getFieldConfigurationItems(parameters, callback) {
@@ -19243,7 +19788,9 @@ class IssueFieldConfigurations {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueFieldConfigurations.getFieldConfigurationItems' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueFieldConfigurations.getFieldConfigurationItems',
+            });
         });
     }
     getAllFieldConfigurationSchemes(parameters, callback) {
@@ -19257,7 +19804,9 @@ class IssueFieldConfigurations {
                     id: parameters === null || parameters === void 0 ? void 0 : parameters.id,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueFieldConfigurations.getAllFieldConfigurationSchemes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueFieldConfigurations.getAllFieldConfigurationSchemes',
+            });
         });
     }
     getFieldConfigurationSchemeMappings(parameters, callback) {
@@ -19271,7 +19820,9 @@ class IssueFieldConfigurations {
                     fieldConfigurationSchemeId: parameters === null || parameters === void 0 ? void 0 : parameters.fieldConfigurationSchemeId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueFieldConfigurations.getFieldConfigurationSchemeMappings' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueFieldConfigurations.getFieldConfigurationSchemeMappings',
+            });
         });
     }
     getFieldConfigurationSchemeProjectMapping(parameters, callback) {
@@ -19285,7 +19836,9 @@ class IssueFieldConfigurations {
                     projectId: parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueFieldConfigurations.getFieldConfigurationSchemeProjectMapping' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueFieldConfigurations.getFieldConfigurationSchemeProjectMapping',
+            });
         });
     }
     assignFieldConfigurationSchemeToProject(parameters, callback) {
@@ -19298,7 +19851,9 @@ class IssueFieldConfigurations {
                     projectId: parameters === null || parameters === void 0 ? void 0 : parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueFieldConfigurations.assignFieldConfigurationSchemeToProject' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueFieldConfigurations.assignFieldConfigurationSchemeToProject',
+            });
         });
     }
 }
@@ -19393,7 +19948,9 @@ class IssueFields {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueFields.getContextsForFieldDeprecated' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueFields.getContextsForFieldDeprecated',
+            });
         });
     }
 }
@@ -19572,7 +20129,9 @@ class IssueNavigatorSettings {
                 url: '/rest/api/2/settings/columns',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueNavigatorSettings.getIssueNavigatorDefaultColumns' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueNavigatorSettings.getIssueNavigatorDefaultColumns',
+            });
         });
     }
     setIssueNavigatorDefaultColumns(callback) {
@@ -19581,7 +20140,9 @@ class IssueNavigatorSettings {
                 url: '/rest/api/2/settings/columns',
                 method: 'PUT',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueNavigatorSettings.setIssueNavigatorDefaultColumns' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueNavigatorSettings.setIssueNavigatorDefaultColumns',
+            });
         });
     }
 }
@@ -19621,7 +20182,9 @@ class IssueNotificationSchemes {
                     expand: parameters === null || parameters === void 0 ? void 0 : parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueNotificationSchemes.getNotificationSchemes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueNotificationSchemes.getNotificationSchemes',
+            });
         });
     }
     getNotificationScheme(parameters, callback) {
@@ -19633,7 +20196,9 @@ class IssueNotificationSchemes {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueNotificationSchemes.getNotificationScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueNotificationSchemes.getNotificationScheme',
+            });
         });
     }
 }
@@ -19716,7 +20281,9 @@ class IssueProperties {
                     properties: parameters === null || parameters === void 0 ? void 0 : parameters.properties,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueProperties.bulkSetIssuesProperties' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueProperties.bulkSetIssuesProperties',
+            });
         });
     }
     bulkSetIssueProperty(parameters, callback) {
@@ -19743,7 +20310,9 @@ class IssueProperties {
                     currentValue: parameters.currentValue,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueProperties.bulkDeleteIssueProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueProperties.bulkDeleteIssueProperty',
+            });
         });
     }
     getIssuePropertyKeys(parameters, callback) {
@@ -19832,7 +20401,9 @@ class IssueRemoteLinks {
                     object: parameters.object,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueRemoteLinks.createOrUpdateRemoteIssueLink' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueRemoteLinks.createOrUpdateRemoteIssueLink',
+            });
         });
     }
     deleteRemoteIssueLinkByGlobalId(parameters, callback) {
@@ -19844,7 +20415,9 @@ class IssueRemoteLinks {
                     globalId: parameters.globalId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueRemoteLinks.deleteRemoteIssueLinkByGlobalId' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueRemoteLinks.deleteRemoteIssueLinkByGlobalId',
+            });
         });
     }
     getRemoteIssueLinkById(parameters, callback) {
@@ -19853,7 +20426,9 @@ class IssueRemoteLinks {
                 url: `/rest/api/2/issue/${parameters.issueIdOrKey}/remotelink/${parameters.linkId}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueRemoteLinks.getRemoteIssueLinkById' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueRemoteLinks.getRemoteIssueLinkById',
+            });
         });
     }
     updateRemoteIssueLink(parameters, callback) {
@@ -19877,7 +20452,9 @@ class IssueRemoteLinks {
                 url: `/rest/api/2/issue/${parameters.issueIdOrKey}/remotelink/${parameters.linkId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueRemoteLinks.deleteRemoteIssueLinkById' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueRemoteLinks.deleteRemoteIssueLinkById',
+            });
         });
     }
 }
@@ -20015,7 +20592,9 @@ class IssueSearch {
                     fieldsByKeys: parameters === null || parameters === void 0 ? void 0 : parameters.fieldsByKeys,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueSearch.searchForIssuesUsingJqlPost' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueSearch.searchForIssuesUsingJqlPost',
+            });
         });
     }
 }
@@ -20056,7 +20635,9 @@ class IssueSecurityLevel {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueSecurityLevel.getIssueSecurityLevelMembers' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueSecurityLevel.getIssueSecurityLevelMembers',
+            });
         });
     }
     getIssueSecurityLevel(parameters, callback) {
@@ -20065,7 +20646,9 @@ class IssueSecurityLevel {
                 url: `/rest/api/2/securitylevel/${parameters.id}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueSecurityLevel.getIssueSecurityLevel' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueSecurityLevel.getIssueSecurityLevel',
+            });
         });
     }
 }
@@ -20100,7 +20683,9 @@ class IssueSecuritySchemes {
                 url: '/rest/api/2/issuesecurityschemes',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueSecuritySchemes.getIssueSecuritySchemes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueSecuritySchemes.getIssueSecuritySchemes',
+            });
         });
     }
     getIssueSecurityScheme(parameters, callback) {
@@ -20109,7 +20694,9 @@ class IssueSecuritySchemes {
                 url: `/rest/api/2/issuesecurityschemes/${parameters.id}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueSecuritySchemes.getIssueSecurityScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueSecuritySchemes.getIssueSecurityScheme',
+            });
         });
     }
 }
@@ -20144,7 +20731,9 @@ class IssueTypeProperties {
                 url: `/rest/api/2/issuetype/${parameters.issueTypeId}/properties`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeProperties.getIssueTypePropertyKeys' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeProperties.getIssueTypePropertyKeys',
+            });
         });
     }
     getIssueTypeProperty(parameters, callback) {
@@ -20153,7 +20742,9 @@ class IssueTypeProperties {
                 url: `/rest/api/2/issuetype/${parameters.issueTypeId}/properties/${parameters.propertyKey}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeProperties.getIssueTypeProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeProperties.getIssueTypeProperty',
+            });
         });
     }
     setIssueTypeProperty(parameters, callback) {
@@ -20162,7 +20753,9 @@ class IssueTypeProperties {
                 url: `/rest/api/2/issuetype/${parameters.issueTypeId}/properties/${parameters.propertyKey}`,
                 method: 'PUT',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeProperties.setIssueTypeProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeProperties.setIssueTypeProperty',
+            });
         });
     }
     deleteIssueTypeProperty(parameters, callback) {
@@ -20171,7 +20764,9 @@ class IssueTypeProperties {
                 url: `/rest/api/2/issuetype/${parameters.issueTypeId}/properties/${parameters.propertyKey}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeProperties.deleteIssueTypeProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeProperties.deleteIssueTypeProperty',
+            });
         });
     }
 }
@@ -20211,7 +20806,9 @@ class IssueTypeSchemes {
                     id: parameters === null || parameters === void 0 ? void 0 : parameters.id,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeSchemes.getAllIssueTypeSchemes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeSchemes.getAllIssueTypeSchemes',
+            });
         });
     }
     createIssueTypeScheme(parameters, callback) {
@@ -20240,7 +20837,9 @@ class IssueTypeSchemes {
                     issueTypeSchemeId: parameters === null || parameters === void 0 ? void 0 : parameters.issueTypeSchemeId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeSchemes.getIssueTypeSchemesMapping' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeSchemes.getIssueTypeSchemesMapping',
+            });
         });
     }
     getIssueTypeSchemeForProjects(parameters, callback) {
@@ -20254,7 +20853,9 @@ class IssueTypeSchemes {
                     projectId: parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeSchemes.getIssueTypeSchemeForProjects' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeSchemes.getIssueTypeSchemeForProjects',
+            });
         });
     }
     assignIssueTypeSchemeToProject(parameters, callback) {
@@ -20267,7 +20868,9 @@ class IssueTypeSchemes {
                     projectId: parameters === null || parameters === void 0 ? void 0 : parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeSchemes.assignIssueTypeSchemeToProject' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeSchemes.assignIssueTypeSchemeToProject',
+            });
         });
     }
     updateIssueTypeScheme(parameters, callback) {
@@ -20302,7 +20905,9 @@ class IssueTypeSchemes {
                     issueTypeIds: parameters.issueTypeIds,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeSchemes.addIssueTypesToIssueTypeScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeSchemes.addIssueTypesToIssueTypeScheme',
+            });
         });
     }
     reorderIssueTypesInIssueTypeScheme(parameters, callback) {
@@ -20316,7 +20921,9 @@ class IssueTypeSchemes {
                     position: parameters.position,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeSchemes.reorderIssueTypesInIssueTypeScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeSchemes.reorderIssueTypesInIssueTypeScheme',
+            });
         });
     }
     removeIssueTypeFromIssueTypeScheme(parameters, callback) {
@@ -20325,7 +20932,9 @@ class IssueTypeSchemes {
                 url: `/rest/api/2/issuetypescheme/${parameters.issueTypeSchemeId}/issuetype/${parameters.issueTypeId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeSchemes.removeIssueTypeFromIssueTypeScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeSchemes.removeIssueTypeFromIssueTypeScheme',
+            });
         });
     }
 }
@@ -20365,7 +20974,9 @@ class IssueTypeScreenSchemes {
                     id: parameters === null || parameters === void 0 ? void 0 : parameters.id,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeScreenSchemes.getIssueTypeScreenSchemes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeScreenSchemes.getIssueTypeScreenSchemes',
+            });
         });
     }
     createIssueTypeScreenScheme(parameters, callback) {
@@ -20379,7 +20990,9 @@ class IssueTypeScreenSchemes {
                     issueTypeMappings: parameters === null || parameters === void 0 ? void 0 : parameters.issueTypeMappings,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeScreenSchemes.createIssueTypeScreenScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeScreenSchemes.createIssueTypeScreenScheme',
+            });
         });
     }
     getIssueTypeScreenSchemeMappings(parameters, callback) {
@@ -20393,7 +21006,9 @@ class IssueTypeScreenSchemes {
                     issueTypeScreenSchemeId: parameters === null || parameters === void 0 ? void 0 : parameters.issueTypeScreenSchemeId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeScreenSchemes.getIssueTypeScreenSchemeMappings' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeScreenSchemes.getIssueTypeScreenSchemeMappings',
+            });
         });
     }
     getIssueTypeScreenSchemeProjectAssociations(parameters, callback) {
@@ -20407,7 +21022,9 @@ class IssueTypeScreenSchemes {
                     projectId: parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeScreenSchemes.getIssueTypeScreenSchemeProjectAssociations' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeScreenSchemes.getIssueTypeScreenSchemeProjectAssociations',
+            });
         });
     }
     assignIssueTypeScreenSchemeToProject(parameters, callback) {
@@ -20420,7 +21037,9 @@ class IssueTypeScreenSchemes {
                     projectId: parameters === null || parameters === void 0 ? void 0 : parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeScreenSchemes.assignIssueTypeScreenSchemeToProject' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeScreenSchemes.assignIssueTypeScreenSchemeToProject',
+            });
         });
     }
     updateIssueTypeScreenScheme(parameters, callback) {
@@ -20433,7 +21052,9 @@ class IssueTypeScreenSchemes {
                     description: parameters.description,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeScreenSchemes.updateIssueTypeScreenScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeScreenSchemes.updateIssueTypeScreenScheme',
+            });
         });
     }
     deleteIssueTypeScreenScheme(parameters, callback) {
@@ -20442,7 +21063,9 @@ class IssueTypeScreenSchemes {
                 url: `/rest/api/2/issuetypescreenscheme/${parameters.issueTypeScreenSchemeId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeScreenSchemes.deleteIssueTypeScreenScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeScreenSchemes.deleteIssueTypeScreenScheme',
+            });
         });
     }
     appendMappingsForIssueTypeScreenScheme(parameters, callback) {
@@ -20454,7 +21077,9 @@ class IssueTypeScreenSchemes {
                     issueTypeMappings: parameters.issueTypeMappings,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeScreenSchemes.appendMappingsForIssueTypeScreenScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeScreenSchemes.appendMappingsForIssueTypeScreenScheme',
+            });
         });
     }
     updateDefaultScreenScheme(parameters, callback) {
@@ -20466,7 +21091,9 @@ class IssueTypeScreenSchemes {
                     screenSchemeId: parameters.screenSchemeId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeScreenSchemes.updateDefaultScreenScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeScreenSchemes.updateDefaultScreenScheme',
+            });
         });
     }
     removeMappingsFromIssueTypeScreenScheme(parameters, callback) {
@@ -20478,7 +21105,9 @@ class IssueTypeScreenSchemes {
                     issueTypeIds: parameters.issueTypeIds,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypeScreenSchemes.removeMappingsFromIssueTypeScreenScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueTypeScreenSchemes.removeMappingsFromIssueTypeScreenScheme',
+            });
         });
     }
 }
@@ -20528,6 +21157,19 @@ class IssueTypes {
                 },
             };
             return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypes.createIssueType' });
+        });
+    }
+    getIssueTypesForProject(parameters, callback) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const config = {
+                url: '/rest/api/2/issuetype/project',
+                method: 'GET',
+                params: {
+                    projectId: parameters.projectId,
+                    level: parameters.level,
+                },
+            };
+            return this.client.sendRequest(config, callback, { methodName: 'version2.issueTypes.getIssueTypesForProject' });
         });
     }
     getIssueType(parameters, callback) {
@@ -20730,7 +21372,9 @@ class IssueWorklogProperties {
                 url: `/rest/api/2/issue/${parameters.issueIdOrKey}/worklog/${parameters.worklogId}/properties`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueWorklogProperties.getWorklogPropertyKeys' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueWorklogProperties.getWorklogPropertyKeys',
+            });
         });
     }
     getWorklogProperty(parameters, callback) {
@@ -20739,7 +21383,9 @@ class IssueWorklogProperties {
                 url: `/rest/api/2/issue/${parameters.issueIdOrKey}/worklog/${parameters.worklogId}/properties/${parameters.propertyKey}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueWorklogProperties.getWorklogProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueWorklogProperties.getWorklogProperty',
+            });
         });
     }
     setWorklogProperty(parameters, callback) {
@@ -20748,7 +21394,9 @@ class IssueWorklogProperties {
                 url: `/rest/api/2/issue/${parameters.issueIdOrKey}/worklog/${parameters.worklogId}/properties/${parameters.propertyKey}`,
                 method: 'PUT',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueWorklogProperties.setWorklogProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueWorklogProperties.setWorklogProperty',
+            });
         });
     }
     deleteWorklogProperty(parameters, callback) {
@@ -20757,7 +21405,9 @@ class IssueWorklogProperties {
                 url: `/rest/api/2/issue/${parameters.issueIdOrKey}/worklog/${parameters.worklogId}/properties/${parameters.propertyKey}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueWorklogProperties.deleteWorklogProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueWorklogProperties.deleteWorklogProperty',
+            });
         });
     }
 }
@@ -20894,7 +21544,9 @@ class IssueWorklogs {
                     since: parameters === null || parameters === void 0 ? void 0 : parameters.since,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueWorklogs.getIdsOfWorklogsDeletedSince' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueWorklogs.getIdsOfWorklogsDeletedSince',
+            });
         });
     }
     getWorklogsForIds(parameters, callback) {
@@ -20922,7 +21574,9 @@ class IssueWorklogs {
                     expand: parameters === null || parameters === void 0 ? void 0 : parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.issueWorklogs.getIdsOfWorklogsModifiedSince' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.issueWorklogs.getIdsOfWorklogsModifiedSince',
+            });
         });
     }
 }
@@ -21927,6 +22581,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 /***/ }),
 
+/***/ 58360:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=contextualConfiguration.js.map
+
+/***/ }),
+
 /***/ 22675:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -21954,6 +22618,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 //# sourceMappingURL=createCustomFieldContext.js.map
+
+/***/ }),
+
+/***/ 60996:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=createProjectDetails.js.map
 
 /***/ }),
 
@@ -22004,6 +22678,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 //# sourceMappingURL=createdIssues.js.map
+
+/***/ }),
+
+/***/ 56168:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=customFieldConfigurations.js.map
 
 /***/ }),
 
@@ -22753,9 +23437,6 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-__exportStar(__nccwpck_require__(7320), exports);
-__exportStar(__nccwpck_require__(41693), exports);
-__exportStar(__nccwpck_require__(45530), exports);
 __exportStar(__nccwpck_require__(15404), exports);
 __exportStar(__nccwpck_require__(93353), exports);
 __exportStar(__nccwpck_require__(78655), exports);
@@ -22777,8 +23458,8 @@ __exportStar(__nccwpck_require__(91766), exports);
 __exportStar(__nccwpck_require__(73524), exports);
 __exportStar(__nccwpck_require__(50936), exports);
 __exportStar(__nccwpck_require__(20840), exports);
-__exportStar(__nccwpck_require__(61153), exports);
 __exportStar(__nccwpck_require__(3794), exports);
+__exportStar(__nccwpck_require__(61153), exports);
 __exportStar(__nccwpck_require__(26451), exports);
 __exportStar(__nccwpck_require__(61623), exports);
 __exportStar(__nccwpck_require__(66600), exports);
@@ -22808,14 +23489,17 @@ __exportStar(__nccwpck_require__(60790), exports);
 __exportStar(__nccwpck_require__(23634), exports);
 __exportStar(__nccwpck_require__(19626), exports);
 __exportStar(__nccwpck_require__(9583), exports);
+__exportStar(__nccwpck_require__(58360), exports);
 __exportStar(__nccwpck_require__(22675), exports);
 __exportStar(__nccwpck_require__(87219), exports);
 __exportStar(__nccwpck_require__(32672), exports);
+__exportStar(__nccwpck_require__(97169), exports);
+__exportStar(__nccwpck_require__(50708), exports);
+__exportStar(__nccwpck_require__(60996), exports);
 __exportStar(__nccwpck_require__(99635), exports);
 __exportStar(__nccwpck_require__(49705), exports);
 __exportStar(__nccwpck_require__(84306), exports);
-__exportStar(__nccwpck_require__(97169), exports);
-__exportStar(__nccwpck_require__(50708), exports);
+__exportStar(__nccwpck_require__(56168), exports);
 __exportStar(__nccwpck_require__(6892), exports);
 __exportStar(__nccwpck_require__(35898), exports);
 __exportStar(__nccwpck_require__(24265), exports);
@@ -22834,6 +23518,8 @@ __exportStar(__nccwpck_require__(474), exports);
 __exportStar(__nccwpck_require__(20681), exports);
 __exportStar(__nccwpck_require__(68706), exports);
 __exportStar(__nccwpck_require__(94509), exports);
+__exportStar(__nccwpck_require__(41693), exports);
+__exportStar(__nccwpck_require__(45530), exports);
 __exportStar(__nccwpck_require__(15358), exports);
 __exportStar(__nccwpck_require__(5949), exports);
 __exportStar(__nccwpck_require__(28721), exports);
@@ -22858,10 +23544,10 @@ __exportStar(__nccwpck_require__(94774), exports);
 __exportStar(__nccwpck_require__(62138), exports);
 __exportStar(__nccwpck_require__(59059), exports);
 __exportStar(__nccwpck_require__(47645), exports);
+__exportStar(__nccwpck_require__(21338), exports);
 __exportStar(__nccwpck_require__(56851), exports);
 __exportStar(__nccwpck_require__(16932), exports);
 __exportStar(__nccwpck_require__(96197), exports);
-__exportStar(__nccwpck_require__(21338), exports);
 __exportStar(__nccwpck_require__(73435), exports);
 __exportStar(__nccwpck_require__(5726), exports);
 __exportStar(__nccwpck_require__(85513), exports);
@@ -22904,7 +23590,11 @@ __exportStar(__nccwpck_require__(99713), exports);
 __exportStar(__nccwpck_require__(84217), exports);
 __exportStar(__nccwpck_require__(66759), exports);
 __exportStar(__nccwpck_require__(39044), exports);
+__exportStar(__nccwpck_require__(67782), exports);
 __exportStar(__nccwpck_require__(28957), exports);
+__exportStar(__nccwpck_require__(53326), exports);
+__exportStar(__nccwpck_require__(89234), exports);
+__exportStar(__nccwpck_require__(19332), exports);
 __exportStar(__nccwpck_require__(92864), exports);
 __exportStar(__nccwpck_require__(7888), exports);
 __exportStar(__nccwpck_require__(68865), exports);
@@ -22925,22 +23615,15 @@ __exportStar(__nccwpck_require__(56623), exports);
 __exportStar(__nccwpck_require__(62386), exports);
 __exportStar(__nccwpck_require__(97291), exports);
 __exportStar(__nccwpck_require__(4881), exports);
-__exportStar(__nccwpck_require__(43760), exports);
 __exportStar(__nccwpck_require__(49383), exports);
+__exportStar(__nccwpck_require__(43760), exports);
+__exportStar(__nccwpck_require__(67999), exports);
 __exportStar(__nccwpck_require__(38413), exports);
 __exportStar(__nccwpck_require__(93815), exports);
 __exportStar(__nccwpck_require__(2481), exports);
 __exportStar(__nccwpck_require__(59124), exports);
-__exportStar(__nccwpck_require__(67999), exports);
 __exportStar(__nccwpck_require__(75361), exports);
 __exportStar(__nccwpck_require__(22349), exports);
-__exportStar(__nccwpck_require__(67782), exports);
-__exportStar(__nccwpck_require__(53326), exports);
-__exportStar(__nccwpck_require__(89234), exports);
-__exportStar(__nccwpck_require__(19332), exports);
-__exportStar(__nccwpck_require__(57438), exports);
-__exportStar(__nccwpck_require__(94649), exports);
-__exportStar(__nccwpck_require__(34870), exports);
 __exportStar(__nccwpck_require__(46664), exports);
 __exportStar(__nccwpck_require__(120), exports);
 __exportStar(__nccwpck_require__(86775), exports);
@@ -22950,10 +23633,11 @@ __exportStar(__nccwpck_require__(42541), exports);
 __exportStar(__nccwpck_require__(33028), exports);
 __exportStar(__nccwpck_require__(22371), exports);
 __exportStar(__nccwpck_require__(39043), exports);
-__exportStar(__nccwpck_require__(6679), exports);
 __exportStar(__nccwpck_require__(81606), exports);
 __exportStar(__nccwpck_require__(92115), exports);
 __exportStar(__nccwpck_require__(29239), exports);
+__exportStar(__nccwpck_require__(6679), exports);
+__exportStar(__nccwpck_require__(57438), exports);
 __exportStar(__nccwpck_require__(15458), exports);
 __exportStar(__nccwpck_require__(20360), exports);
 __exportStar(__nccwpck_require__(52108), exports);
@@ -22964,12 +23648,15 @@ __exportStar(__nccwpck_require__(94886), exports);
 __exportStar(__nccwpck_require__(17059), exports);
 __exportStar(__nccwpck_require__(37429), exports);
 __exportStar(__nccwpck_require__(75817), exports);
+__exportStar(__nccwpck_require__(94649), exports);
+__exportStar(__nccwpck_require__(34870), exports);
 __exportStar(__nccwpck_require__(31487), exports);
 __exportStar(__nccwpck_require__(19600), exports);
 __exportStar(__nccwpck_require__(32977), exports);
+__exportStar(__nccwpck_require__(7320), exports);
+__exportStar(__nccwpck_require__(25164), exports);
 __exportStar(__nccwpck_require__(99113), exports);
 __exportStar(__nccwpck_require__(13731), exports);
-__exportStar(__nccwpck_require__(25164), exports);
 __exportStar(__nccwpck_require__(11367), exports);
 __exportStar(__nccwpck_require__(48282), exports);
 __exportStar(__nccwpck_require__(54276), exports);
@@ -23028,20 +23715,21 @@ __exportStar(__nccwpck_require__(35100), exports);
 __exportStar(__nccwpck_require__(75174), exports);
 __exportStar(__nccwpck_require__(42991), exports);
 __exportStar(__nccwpck_require__(5625), exports);
+__exportStar(__nccwpck_require__(37860), exports);
+__exportStar(__nccwpck_require__(34521), exports);
 __exportStar(__nccwpck_require__(58961), exports);
 __exportStar(__nccwpck_require__(13469), exports);
 __exportStar(__nccwpck_require__(91537), exports);
 __exportStar(__nccwpck_require__(23493), exports);
-__exportStar(__nccwpck_require__(34521), exports);
 __exportStar(__nccwpck_require__(3723), exports);
 __exportStar(__nccwpck_require__(87825), exports);
 __exportStar(__nccwpck_require__(81995), exports);
 __exportStar(__nccwpck_require__(54317), exports);
 __exportStar(__nccwpck_require__(89116), exports);
 __exportStar(__nccwpck_require__(99941), exports);
+__exportStar(__nccwpck_require__(65251), exports);
 __exportStar(__nccwpck_require__(73256), exports);
 __exportStar(__nccwpck_require__(59153), exports);
-__exportStar(__nccwpck_require__(65251), exports);
 __exportStar(__nccwpck_require__(43000), exports);
 __exportStar(__nccwpck_require__(69441), exports);
 __exportStar(__nccwpck_require__(50088), exports);
@@ -23050,8 +23738,8 @@ __exportStar(__nccwpck_require__(27689), exports);
 __exportStar(__nccwpck_require__(56674), exports);
 __exportStar(__nccwpck_require__(60192), exports);
 __exportStar(__nccwpck_require__(19279), exports);
-__exportStar(__nccwpck_require__(80005), exports);
 __exportStar(__nccwpck_require__(13762), exports);
+__exportStar(__nccwpck_require__(80005), exports);
 __exportStar(__nccwpck_require__(48164), exports);
 __exportStar(__nccwpck_require__(70545), exports);
 __exportStar(__nccwpck_require__(93988), exports);
@@ -23090,6 +23778,8 @@ __exportStar(__nccwpck_require__(27376), exports);
 __exportStar(__nccwpck_require__(69998), exports);
 __exportStar(__nccwpck_require__(72682), exports);
 __exportStar(__nccwpck_require__(41721), exports);
+__exportStar(__nccwpck_require__(49242), exports);
+__exportStar(__nccwpck_require__(69179), exports);
 __exportStar(__nccwpck_require__(49346), exports);
 __exportStar(__nccwpck_require__(78218), exports);
 __exportStar(__nccwpck_require__(91918), exports);
@@ -23098,8 +23788,6 @@ __exportStar(__nccwpck_require__(90601), exports);
 __exportStar(__nccwpck_require__(45709), exports);
 __exportStar(__nccwpck_require__(49212), exports);
 __exportStar(__nccwpck_require__(67259), exports);
-__exportStar(__nccwpck_require__(49242), exports);
-__exportStar(__nccwpck_require__(69179), exports);
 __exportStar(__nccwpck_require__(21372), exports);
 __exportStar(__nccwpck_require__(62883), exports);
 __exportStar(__nccwpck_require__(940), exports);
@@ -23116,6 +23804,7 @@ __exportStar(__nccwpck_require__(32993), exports);
 __exportStar(__nccwpck_require__(15818), exports);
 __exportStar(__nccwpck_require__(54518), exports);
 __exportStar(__nccwpck_require__(89184), exports);
+__exportStar(__nccwpck_require__(8695), exports);
 __exportStar(__nccwpck_require__(53003), exports);
 __exportStar(__nccwpck_require__(11317), exports);
 __exportStar(__nccwpck_require__(34287), exports);
@@ -23130,11 +23819,12 @@ __exportStar(__nccwpck_require__(90330), exports);
 __exportStar(__nccwpck_require__(46766), exports);
 __exportStar(__nccwpck_require__(49149), exports);
 __exportStar(__nccwpck_require__(13262), exports);
+__exportStar(__nccwpck_require__(53092), exports);
+__exportStar(__nccwpck_require__(13720), exports);
 __exportStar(__nccwpck_require__(54164), exports);
 __exportStar(__nccwpck_require__(81019), exports);
 __exportStar(__nccwpck_require__(37959), exports);
 __exportStar(__nccwpck_require__(74110), exports);
-__exportStar(__nccwpck_require__(53092), exports);
 __exportStar(__nccwpck_require__(98981), exports);
 __exportStar(__nccwpck_require__(99461), exports);
 __exportStar(__nccwpck_require__(64134), exports);
@@ -23170,6 +23860,7 @@ __exportStar(__nccwpck_require__(37752), exports);
 __exportStar(__nccwpck_require__(59987), exports);
 __exportStar(__nccwpck_require__(96230), exports);
 __exportStar(__nccwpck_require__(53812), exports);
+__exportStar(__nccwpck_require__(6747), exports);
 __exportStar(__nccwpck_require__(93245), exports);
 __exportStar(__nccwpck_require__(35413), exports);
 __exportStar(__nccwpck_require__(35915), exports);
@@ -23178,7 +23869,6 @@ __exportStar(__nccwpck_require__(96343), exports);
 __exportStar(__nccwpck_require__(51359), exports);
 __exportStar(__nccwpck_require__(88176), exports);
 __exportStar(__nccwpck_require__(65197), exports);
-__exportStar(__nccwpck_require__(6747), exports);
 __exportStar(__nccwpck_require__(41027), exports);
 __exportStar(__nccwpck_require__(44990), exports);
 //# sourceMappingURL=index.js.map
@@ -24605,6 +25295,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 /***/ }),
 
+/***/ 37860:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=pageContextualConfiguration.js.map
+
+/***/ }),
+
 /***/ 58961:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -25485,6 +26185,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 /***/ }),
 
+/***/ 8695:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=statusMapping.js.map
+
+/***/ }),
+
 /***/ 53003:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -25622,6 +26332,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 //# sourceMappingURL=updateDefaultScreenScheme.js.map
+
+/***/ }),
+
+/***/ 13720:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=updateProjectDetails.js.map
 
 /***/ }),
 
@@ -27989,6 +28709,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 /***/ }),
 
+/***/ 77942:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=getCustomFieldConfiguration.js.map
+
+/***/ }),
+
 /***/ 42553:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -28446,6 +29176,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 //# sourceMappingURL=getIssueTypeScreenSchemes.js.map
+
+/***/ }),
+
+/***/ 89461:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=getIssueTypesForProject.js.map
 
 /***/ }),
 
@@ -29205,396 +29945,400 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-__exportStar(__nccwpck_require__(73015), exports);
-__exportStar(__nccwpck_require__(87380), exports);
-__exportStar(__nccwpck_require__(81931), exports);
-__exportStar(__nccwpck_require__(38476), exports);
-__exportStar(__nccwpck_require__(94834), exports);
-__exportStar(__nccwpck_require__(97025), exports);
+__exportStar(__nccwpck_require__(61605), exports);
+__exportStar(__nccwpck_require__(8163), exports);
+__exportStar(__nccwpck_require__(74778), exports);
+__exportStar(__nccwpck_require__(94788), exports);
+__exportStar(__nccwpck_require__(49721), exports);
+__exportStar(__nccwpck_require__(52863), exports);
+__exportStar(__nccwpck_require__(42133), exports);
+__exportStar(__nccwpck_require__(9128), exports);
+__exportStar(__nccwpck_require__(34967), exports);
+__exportStar(__nccwpck_require__(21904), exports);
+__exportStar(__nccwpck_require__(53299), exports);
+__exportStar(__nccwpck_require__(11523), exports);
+__exportStar(__nccwpck_require__(79587), exports);
+__exportStar(__nccwpck_require__(17256), exports);
+__exportStar(__nccwpck_require__(18862), exports);
+__exportStar(__nccwpck_require__(82455), exports);
+__exportStar(__nccwpck_require__(49448), exports);
+__exportStar(__nccwpck_require__(8283), exports);
+__exportStar(__nccwpck_require__(83082), exports);
+__exportStar(__nccwpck_require__(21279), exports);
+__exportStar(__nccwpck_require__(65869), exports);
+__exportStar(__nccwpck_require__(19615), exports);
+__exportStar(__nccwpck_require__(64318), exports);
+__exportStar(__nccwpck_require__(2224), exports);
+__exportStar(__nccwpck_require__(47008), exports);
+__exportStar(__nccwpck_require__(1326), exports);
+__exportStar(__nccwpck_require__(70507), exports);
+__exportStar(__nccwpck_require__(68798), exports);
+__exportStar(__nccwpck_require__(54978), exports);
+__exportStar(__nccwpck_require__(69146), exports);
+__exportStar(__nccwpck_require__(96275), exports);
+__exportStar(__nccwpck_require__(65430), exports);
+__exportStar(__nccwpck_require__(75420), exports);
+__exportStar(__nccwpck_require__(58836), exports);
+__exportStar(__nccwpck_require__(12163), exports);
+__exportStar(__nccwpck_require__(52632), exports);
+__exportStar(__nccwpck_require__(85659), exports);
+__exportStar(__nccwpck_require__(5779), exports);
+__exportStar(__nccwpck_require__(90831), exports);
+__exportStar(__nccwpck_require__(33894), exports);
+__exportStar(__nccwpck_require__(97590), exports);
+__exportStar(__nccwpck_require__(56896), exports);
+__exportStar(__nccwpck_require__(63056), exports);
+__exportStar(__nccwpck_require__(68183), exports);
+__exportStar(__nccwpck_require__(21124), exports);
+__exportStar(__nccwpck_require__(67836), exports);
+__exportStar(__nccwpck_require__(939), exports);
+__exportStar(__nccwpck_require__(82429), exports);
+__exportStar(__nccwpck_require__(95792), exports);
+__exportStar(__nccwpck_require__(68494), exports);
+__exportStar(__nccwpck_require__(31862), exports);
+__exportStar(__nccwpck_require__(83593), exports);
+__exportStar(__nccwpck_require__(32580), exports);
+__exportStar(__nccwpck_require__(39553), exports);
+__exportStar(__nccwpck_require__(99698), exports);
+__exportStar(__nccwpck_require__(31931), exports);
+__exportStar(__nccwpck_require__(77124), exports);
+__exportStar(__nccwpck_require__(89521), exports);
+__exportStar(__nccwpck_require__(21456), exports);
+__exportStar(__nccwpck_require__(78767), exports);
+__exportStar(__nccwpck_require__(80662), exports);
+__exportStar(__nccwpck_require__(26161), exports);
+__exportStar(__nccwpck_require__(52338), exports);
+__exportStar(__nccwpck_require__(26322), exports);
+__exportStar(__nccwpck_require__(74906), exports);
+__exportStar(__nccwpck_require__(43022), exports);
+__exportStar(__nccwpck_require__(24256), exports);
+__exportStar(__nccwpck_require__(53570), exports);
+__exportStar(__nccwpck_require__(45354), exports);
+__exportStar(__nccwpck_require__(26345), exports);
+__exportStar(__nccwpck_require__(7562), exports);
+__exportStar(__nccwpck_require__(91461), exports);
+__exportStar(__nccwpck_require__(29468), exports);
+__exportStar(__nccwpck_require__(26757), exports);
+__exportStar(__nccwpck_require__(78695), exports);
+__exportStar(__nccwpck_require__(32014), exports);
+__exportStar(__nccwpck_require__(87266), exports);
+__exportStar(__nccwpck_require__(16159), exports);
+__exportStar(__nccwpck_require__(48003), exports);
+__exportStar(__nccwpck_require__(4499), exports);
+__exportStar(__nccwpck_require__(60888), exports);
+__exportStar(__nccwpck_require__(90161), exports);
+__exportStar(__nccwpck_require__(89063), exports);
+__exportStar(__nccwpck_require__(9180), exports);
+__exportStar(__nccwpck_require__(80280), exports);
+__exportStar(__nccwpck_require__(97498), exports);
+__exportStar(__nccwpck_require__(64195), exports);
+__exportStar(__nccwpck_require__(10680), exports);
+__exportStar(__nccwpck_require__(45103), exports);
+__exportStar(__nccwpck_require__(90462), exports);
+__exportStar(__nccwpck_require__(95968), exports);
+__exportStar(__nccwpck_require__(33916), exports);
+__exportStar(__nccwpck_require__(64006), exports);
+__exportStar(__nccwpck_require__(47150), exports);
+__exportStar(__nccwpck_require__(60439), exports);
+__exportStar(__nccwpck_require__(3690), exports);
+__exportStar(__nccwpck_require__(65013), exports);
+__exportStar(__nccwpck_require__(70808), exports);
+__exportStar(__nccwpck_require__(99272), exports);
+__exportStar(__nccwpck_require__(26186), exports);
+__exportStar(__nccwpck_require__(86327), exports);
+__exportStar(__nccwpck_require__(89424), exports);
+__exportStar(__nccwpck_require__(4678), exports);
+__exportStar(__nccwpck_require__(8353), exports);
+__exportStar(__nccwpck_require__(65090), exports);
+__exportStar(__nccwpck_require__(51275), exports);
+__exportStar(__nccwpck_require__(45822), exports);
+__exportStar(__nccwpck_require__(13358), exports);
+__exportStar(__nccwpck_require__(20178), exports);
+__exportStar(__nccwpck_require__(65277), exports);
+__exportStar(__nccwpck_require__(80828), exports);
+__exportStar(__nccwpck_require__(31932), exports);
+__exportStar(__nccwpck_require__(45784), exports);
+__exportStar(__nccwpck_require__(55591), exports);
+__exportStar(__nccwpck_require__(46890), exports);
+__exportStar(__nccwpck_require__(99790), exports);
+__exportStar(__nccwpck_require__(19328), exports);
+__exportStar(__nccwpck_require__(89193), exports);
+__exportStar(__nccwpck_require__(63800), exports);
 __exportStar(__nccwpck_require__(113), exports);
 __exportStar(__nccwpck_require__(19421), exports);
-__exportStar(__nccwpck_require__(8163), exports);
-__exportStar(__nccwpck_require__(37679), exports);
-__exportStar(__nccwpck_require__(46217), exports);
-__exportStar(__nccwpck_require__(86272), exports);
-__exportStar(__nccwpck_require__(74176), exports);
-__exportStar(__nccwpck_require__(53570), exports);
-__exportStar(__nccwpck_require__(38072), exports);
-__exportStar(__nccwpck_require__(30018), exports);
-__exportStar(__nccwpck_require__(74778), exports);
-__exportStar(__nccwpck_require__(23505), exports);
-__exportStar(__nccwpck_require__(76543), exports);
-__exportStar(__nccwpck_require__(45354), exports);
-__exportStar(__nccwpck_require__(77928), exports);
-__exportStar(__nccwpck_require__(7106), exports);
-__exportStar(__nccwpck_require__(55197), exports);
-__exportStar(__nccwpck_require__(26345), exports);
-__exportStar(__nccwpck_require__(58836), exports);
-__exportStar(__nccwpck_require__(94744), exports);
-__exportStar(__nccwpck_require__(41902), exports);
-__exportStar(__nccwpck_require__(7562), exports);
-__exportStar(__nccwpck_require__(94403), exports);
-__exportStar(__nccwpck_require__(30854), exports);
-__exportStar(__nccwpck_require__(24998), exports);
-__exportStar(__nccwpck_require__(26109), exports);
-__exportStar(__nccwpck_require__(81233), exports);
-__exportStar(__nccwpck_require__(65279), exports);
-__exportStar(__nccwpck_require__(5779), exports);
-__exportStar(__nccwpck_require__(18276), exports);
-__exportStar(__nccwpck_require__(18281), exports);
-__exportStar(__nccwpck_require__(6689), exports);
-__exportStar(__nccwpck_require__(85659), exports);
-__exportStar(__nccwpck_require__(70537), exports);
-__exportStar(__nccwpck_require__(33042), exports);
-__exportStar(__nccwpck_require__(29468), exports);
+__exportStar(__nccwpck_require__(60628), exports);
+__exportStar(__nccwpck_require__(3392), exports);
+__exportStar(__nccwpck_require__(20095), exports);
+__exportStar(__nccwpck_require__(87978), exports);
+__exportStar(__nccwpck_require__(11165), exports);
+__exportStar(__nccwpck_require__(80849), exports);
+__exportStar(__nccwpck_require__(84764), exports);
+__exportStar(__nccwpck_require__(26137), exports);
+__exportStar(__nccwpck_require__(79307), exports);
+__exportStar(__nccwpck_require__(63294), exports);
+__exportStar(__nccwpck_require__(39696), exports);
+__exportStar(__nccwpck_require__(61914), exports);
+__exportStar(__nccwpck_require__(1145), exports);
+__exportStar(__nccwpck_require__(23606), exports);
 __exportStar(__nccwpck_require__(53640), exports);
-__exportStar(__nccwpck_require__(90831), exports);
-__exportStar(__nccwpck_require__(36170), exports);
-__exportStar(__nccwpck_require__(62839), exports);
-__exportStar(__nccwpck_require__(28013), exports);
-__exportStar(__nccwpck_require__(32649), exports);
-__exportStar(__nccwpck_require__(78695), exports);
-__exportStar(__nccwpck_require__(58663), exports);
-__exportStar(__nccwpck_require__(34761), exports);
-__exportStar(__nccwpck_require__(26757), exports);
-__exportStar(__nccwpck_require__(75420), exports);
-__exportStar(__nccwpck_require__(18862), exports);
-__exportStar(__nccwpck_require__(63800), exports);
-__exportStar(__nccwpck_require__(12163), exports);
-__exportStar(__nccwpck_require__(43727), exports);
-__exportStar(__nccwpck_require__(82482), exports);
-__exportStar(__nccwpck_require__(90124), exports);
-__exportStar(__nccwpck_require__(73231), exports);
-__exportStar(__nccwpck_require__(52632), exports);
-__exportStar(__nccwpck_require__(15276), exports);
-__exportStar(__nccwpck_require__(4848), exports);
-__exportStar(__nccwpck_require__(28169), exports);
-__exportStar(__nccwpck_require__(42553), exports);
-__exportStar(__nccwpck_require__(48624), exports);
-__exportStar(__nccwpck_require__(45137), exports);
-__exportStar(__nccwpck_require__(91461), exports);
-__exportStar(__nccwpck_require__(49721), exports);
-__exportStar(__nccwpck_require__(15816), exports);
-__exportStar(__nccwpck_require__(64318), exports);
-__exportStar(__nccwpck_require__(43487), exports);
-__exportStar(__nccwpck_require__(84026), exports);
-__exportStar(__nccwpck_require__(2560), exports);
-__exportStar(__nccwpck_require__(77124), exports);
-__exportStar(__nccwpck_require__(94788), exports);
-__exportStar(__nccwpck_require__(61030), exports);
-__exportStar(__nccwpck_require__(86327), exports);
-__exportStar(__nccwpck_require__(35892), exports);
-__exportStar(__nccwpck_require__(83809), exports);
-__exportStar(__nccwpck_require__(63056), exports);
-__exportStar(__nccwpck_require__(7798), exports);
-__exportStar(__nccwpck_require__(23188), exports);
-__exportStar(__nccwpck_require__(37349), exports);
-__exportStar(__nccwpck_require__(55813), exports);
-__exportStar(__nccwpck_require__(89063), exports);
-__exportStar(__nccwpck_require__(76869), exports);
 __exportStar(__nccwpck_require__(30219), exports);
-__exportStar(__nccwpck_require__(430), exports);
 __exportStar(__nccwpck_require__(85588), exports);
+__exportStar(__nccwpck_require__(83809), exports);
+__exportStar(__nccwpck_require__(83242), exports);
+__exportStar(__nccwpck_require__(7295), exports);
+__exportStar(__nccwpck_require__(88218), exports);
+__exportStar(__nccwpck_require__(53811), exports);
+__exportStar(__nccwpck_require__(50790), exports);
+__exportStar(__nccwpck_require__(77076), exports);
+__exportStar(__nccwpck_require__(43504), exports);
+__exportStar(__nccwpck_require__(76414), exports);
+__exportStar(__nccwpck_require__(46217), exports);
+__exportStar(__nccwpck_require__(96947), exports);
+__exportStar(__nccwpck_require__(3661), exports);
+__exportStar(__nccwpck_require__(4469), exports);
+__exportStar(__nccwpck_require__(37199), exports);
+__exportStar(__nccwpck_require__(91170), exports);
+__exportStar(__nccwpck_require__(87380), exports);
+__exportStar(__nccwpck_require__(38476), exports);
+__exportStar(__nccwpck_require__(40551), exports);
+__exportStar(__nccwpck_require__(94834), exports);
+__exportStar(__nccwpck_require__(37679), exports);
+__exportStar(__nccwpck_require__(88536), exports);
+__exportStar(__nccwpck_require__(35892), exports);
+__exportStar(__nccwpck_require__(86272), exports);
+__exportStar(__nccwpck_require__(92798), exports);
+__exportStar(__nccwpck_require__(70224), exports);
+__exportStar(__nccwpck_require__(55183), exports);
+__exportStar(__nccwpck_require__(23505), exports);
+__exportStar(__nccwpck_require__(7106), exports);
+__exportStar(__nccwpck_require__(77928), exports);
+__exportStar(__nccwpck_require__(30018), exports);
+__exportStar(__nccwpck_require__(38072), exports);
+__exportStar(__nccwpck_require__(94744), exports);
+__exportStar(__nccwpck_require__(94403), exports);
+__exportStar(__nccwpck_require__(73231), exports);
+__exportStar(__nccwpck_require__(90124), exports);
+__exportStar(__nccwpck_require__(85944), exports);
+__exportStar(__nccwpck_require__(34544), exports);
+__exportStar(__nccwpck_require__(77942), exports);
+__exportStar(__nccwpck_require__(42553), exports);
+__exportStar(__nccwpck_require__(18281), exports);
+__exportStar(__nccwpck_require__(58663), exports);
+__exportStar(__nccwpck_require__(28013), exports);
+__exportStar(__nccwpck_require__(62839), exports);
+__exportStar(__nccwpck_require__(36170), exports);
+__exportStar(__nccwpck_require__(15276), exports);
+__exportStar(__nccwpck_require__(73622), exports);
+__exportStar(__nccwpck_require__(30674), exports);
+__exportStar(__nccwpck_require__(39679), exports);
+__exportStar(__nccwpck_require__(94199), exports);
+__exportStar(__nccwpck_require__(8837), exports);
+__exportStar(__nccwpck_require__(57469), exports);
+__exportStar(__nccwpck_require__(67179), exports);
+__exportStar(__nccwpck_require__(58705), exports);
+__exportStar(__nccwpck_require__(74167), exports);
+__exportStar(__nccwpck_require__(430), exports);
 __exportStar(__nccwpck_require__(75747), exports);
 __exportStar(__nccwpck_require__(34089), exports);
-__exportStar(__nccwpck_require__(8283), exports);
-__exportStar(__nccwpck_require__(78960), exports);
-__exportStar(__nccwpck_require__(33894), exports);
-__exportStar(__nccwpck_require__(67179), exports);
-__exportStar(__nccwpck_require__(93579), exports);
-__exportStar(__nccwpck_require__(36901), exports);
+__exportStar(__nccwpck_require__(43727), exports);
 __exportStar(__nccwpck_require__(60663), exports);
-__exportStar(__nccwpck_require__(95938), exports);
-__exportStar(__nccwpck_require__(4499), exports);
-__exportStar(__nccwpck_require__(55183), exports);
-__exportStar(__nccwpck_require__(8787), exports);
-__exportStar(__nccwpck_require__(89288), exports);
-__exportStar(__nccwpck_require__(26378), exports);
-__exportStar(__nccwpck_require__(48003), exports);
-__exportStar(__nccwpck_require__(79051), exports);
-__exportStar(__nccwpck_require__(42760), exports);
-__exportStar(__nccwpck_require__(21904), exports);
-__exportStar(__nccwpck_require__(96164), exports);
-__exportStar(__nccwpck_require__(8353), exports);
+__exportStar(__nccwpck_require__(78960), exports);
+__exportStar(__nccwpck_require__(36901), exports);
 __exportStar(__nccwpck_require__(88582), exports);
-__exportStar(__nccwpck_require__(97590), exports);
-__exportStar(__nccwpck_require__(41675), exports);
-__exportStar(__nccwpck_require__(70507), exports);
-__exportStar(__nccwpck_require__(7251), exports);
-__exportStar(__nccwpck_require__(53299), exports);
-__exportStar(__nccwpck_require__(18900), exports);
-__exportStar(__nccwpck_require__(20095), exports);
-__exportStar(__nccwpck_require__(80849), exports);
-__exportStar(__nccwpck_require__(56896), exports);
-__exportStar(__nccwpck_require__(21124), exports);
-__exportStar(__nccwpck_require__(85944), exports);
-__exportStar(__nccwpck_require__(13112), exports);
-__exportStar(__nccwpck_require__(89193), exports);
-__exportStar(__nccwpck_require__(90161), exports);
-__exportStar(__nccwpck_require__(83082), exports);
-__exportStar(__nccwpck_require__(70224), exports);
-__exportStar(__nccwpck_require__(8837), exports);
-__exportStar(__nccwpck_require__(454), exports);
-__exportStar(__nccwpck_require__(47479), exports);
-__exportStar(__nccwpck_require__(19328), exports);
-__exportStar(__nccwpck_require__(63678), exports);
-__exportStar(__nccwpck_require__(77233), exports);
-__exportStar(__nccwpck_require__(88306), exports);
-__exportStar(__nccwpck_require__(44747), exports);
-__exportStar(__nccwpck_require__(96275), exports);
-__exportStar(__nccwpck_require__(69146), exports);
-__exportStar(__nccwpck_require__(1326), exports);
-__exportStar(__nccwpck_require__(95027), exports);
-__exportStar(__nccwpck_require__(85801), exports);
-__exportStar(__nccwpck_require__(62608), exports);
-__exportStar(__nccwpck_require__(97498), exports);
-__exportStar(__nccwpck_require__(55270), exports);
-__exportStar(__nccwpck_require__(68494), exports);
-__exportStar(__nccwpck_require__(99272), exports);
-__exportStar(__nccwpck_require__(24887), exports);
-__exportStar(__nccwpck_require__(36215), exports);
-__exportStar(__nccwpck_require__(26186), exports);
-__exportStar(__nccwpck_require__(42714), exports);
-__exportStar(__nccwpck_require__(11523), exports);
-__exportStar(__nccwpck_require__(53486), exports);
-__exportStar(__nccwpck_require__(67387), exports);
-__exportStar(__nccwpck_require__(79587), exports);
-__exportStar(__nccwpck_require__(77694), exports);
-__exportStar(__nccwpck_require__(36826), exports);
-__exportStar(__nccwpck_require__(17256), exports);
-__exportStar(__nccwpck_require__(29835), exports);
-__exportStar(__nccwpck_require__(93845), exports);
-__exportStar(__nccwpck_require__(46890), exports);
+__exportStar(__nccwpck_require__(24163), exports);
 __exportStar(__nccwpck_require__(7926), exports);
-__exportStar(__nccwpck_require__(22559), exports);
 __exportStar(__nccwpck_require__(62146), exports);
-__exportStar(__nccwpck_require__(19992), exports);
-__exportStar(__nccwpck_require__(39428), exports);
-__exportStar(__nccwpck_require__(85755), exports);
-__exportStar(__nccwpck_require__(99790), exports);
-__exportStar(__nccwpck_require__(30115), exports);
+__exportStar(__nccwpck_require__(13112), exports);
+__exportStar(__nccwpck_require__(37349), exports);
 __exportStar(__nccwpck_require__(31123), exports);
-__exportStar(__nccwpck_require__(9180), exports);
-__exportStar(__nccwpck_require__(68183), exports);
 __exportStar(__nccwpck_require__(86036), exports);
-__exportStar(__nccwpck_require__(64239), exports);
-__exportStar(__nccwpck_require__(80280), exports);
-__exportStar(__nccwpck_require__(3465), exports);
-__exportStar(__nccwpck_require__(16063), exports);
+__exportStar(__nccwpck_require__(63678), exports);
+__exportStar(__nccwpck_require__(85801), exports);
+__exportStar(__nccwpck_require__(95027), exports);
 __exportStar(__nccwpck_require__(48489), exports);
-__exportStar(__nccwpck_require__(67836), exports);
+__exportStar(__nccwpck_require__(16063), exports);
+__exportStar(__nccwpck_require__(3465), exports);
 __exportStar(__nccwpck_require__(71130), exports);
-__exportStar(__nccwpck_require__(25232), exports);
-__exportStar(__nccwpck_require__(64195), exports);
-__exportStar(__nccwpck_require__(91170), exports);
-__exportStar(__nccwpck_require__(939), exports);
-__exportStar(__nccwpck_require__(69167), exports);
+__exportStar(__nccwpck_require__(28169), exports);
 __exportStar(__nccwpck_require__(95858), exports);
-__exportStar(__nccwpck_require__(47502), exports);
-__exportStar(__nccwpck_require__(10680), exports);
-__exportStar(__nccwpck_require__(83242), exports);
-__exportStar(__nccwpck_require__(82429), exports);
-__exportStar(__nccwpck_require__(98745), exports);
+__exportStar(__nccwpck_require__(69167), exports);
 __exportStar(__nccwpck_require__(17427), exports);
-__exportStar(__nccwpck_require__(21279), exports);
-__exportStar(__nccwpck_require__(65036), exports);
-__exportStar(__nccwpck_require__(45103), exports);
-__exportStar(__nccwpck_require__(52863), exports);
-__exportStar(__nccwpck_require__(33766), exports);
-__exportStar(__nccwpck_require__(9778), exports);
-__exportStar(__nccwpck_require__(44432), exports);
-__exportStar(__nccwpck_require__(95792), exports);
+__exportStar(__nccwpck_require__(98745), exports);
 __exportStar(__nccwpck_require__(28479), exports);
 __exportStar(__nccwpck_require__(93065), exports);
-__exportStar(__nccwpck_require__(65869), exports);
-__exportStar(__nccwpck_require__(57761), exports);
-__exportStar(__nccwpck_require__(90462), exports);
-__exportStar(__nccwpck_require__(82455), exports);
-__exportStar(__nccwpck_require__(71572), exports);
-__exportStar(__nccwpck_require__(50550), exports);
-__exportStar(__nccwpck_require__(88536), exports);
-__exportStar(__nccwpck_require__(74167), exports);
-__exportStar(__nccwpck_require__(29866), exports);
-__exportStar(__nccwpck_require__(97174), exports);
-__exportStar(__nccwpck_require__(7295), exports);
+__exportStar(__nccwpck_require__(44432), exports);
+__exportStar(__nccwpck_require__(89461), exports);
+__exportStar(__nccwpck_require__(67387), exports);
+__exportStar(__nccwpck_require__(36826), exports);
+__exportStar(__nccwpck_require__(93579), exports);
 __exportStar(__nccwpck_require__(58327), exports);
-__exportStar(__nccwpck_require__(92798), exports);
+__exportStar(__nccwpck_require__(39821), exports);
+__exportStar(__nccwpck_require__(45809), exports);
+__exportStar(__nccwpck_require__(43192), exports);
+__exportStar(__nccwpck_require__(6689), exports);
+__exportStar(__nccwpck_require__(65279), exports);
+__exportStar(__nccwpck_require__(44575), exports);
+__exportStar(__nccwpck_require__(16417), exports);
+__exportStar(__nccwpck_require__(36540), exports);
 __exportStar(__nccwpck_require__(99182), exports);
 __exportStar(__nccwpck_require__(48198), exports);
-__exportStar(__nccwpck_require__(71633), exports);
-__exportStar(__nccwpck_require__(60829), exports);
-__exportStar(__nccwpck_require__(10391), exports);
-__exportStar(__nccwpck_require__(34544), exports);
-__exportStar(__nccwpck_require__(43192), exports);
-__exportStar(__nccwpck_require__(39821), exports);
-__exportStar(__nccwpck_require__(88218), exports);
-__exportStar(__nccwpck_require__(83593), exports);
-__exportStar(__nccwpck_require__(44575), exports);
-__exportStar(__nccwpck_require__(72924), exports);
-__exportStar(__nccwpck_require__(95968), exports);
-__exportStar(__nccwpck_require__(36540), exports);
-__exportStar(__nccwpck_require__(31862), exports);
-__exportStar(__nccwpck_require__(16417), exports);
-__exportStar(__nccwpck_require__(33916), exports);
 __exportStar(__nccwpck_require__(25546), exports);
-__exportStar(__nccwpck_require__(50790), exports);
-__exportStar(__nccwpck_require__(32580), exports);
-__exportStar(__nccwpck_require__(59889), exports);
 __exportStar(__nccwpck_require__(86084), exports);
-__exportStar(__nccwpck_require__(29295), exports);
-__exportStar(__nccwpck_require__(64006), exports);
-__exportStar(__nccwpck_require__(49448), exports);
-__exportStar(__nccwpck_require__(47150), exports);
-__exportStar(__nccwpck_require__(26417), exports);
-__exportStar(__nccwpck_require__(76414), exports);
-__exportStar(__nccwpck_require__(82941), exports);
-__exportStar(__nccwpck_require__(24163), exports);
-__exportStar(__nccwpck_require__(45809), exports);
-__exportStar(__nccwpck_require__(6795), exports);
-__exportStar(__nccwpck_require__(61914), exports);
-__exportStar(__nccwpck_require__(51149), exports);
-__exportStar(__nccwpck_require__(60439), exports);
-__exportStar(__nccwpck_require__(39553), exports);
-__exportStar(__nccwpck_require__(53811), exports);
-__exportStar(__nccwpck_require__(58705), exports);
-__exportStar(__nccwpck_require__(25315), exports);
-__exportStar(__nccwpck_require__(88416), exports);
-__exportStar(__nccwpck_require__(95911), exports);
-__exportStar(__nccwpck_require__(45953), exports);
-__exportStar(__nccwpck_require__(3690), exports);
-__exportStar(__nccwpck_require__(15495), exports);
-__exportStar(__nccwpck_require__(38869), exports);
-__exportStar(__nccwpck_require__(85590), exports);
-__exportStar(__nccwpck_require__(31931), exports);
-__exportStar(__nccwpck_require__(19186), exports);
-__exportStar(__nccwpck_require__(86745), exports);
-__exportStar(__nccwpck_require__(39696), exports);
-__exportStar(__nccwpck_require__(65013), exports);
-__exportStar(__nccwpck_require__(61605), exports);
-__exportStar(__nccwpck_require__(88868), exports);
-__exportStar(__nccwpck_require__(74906), exports);
-__exportStar(__nccwpck_require__(99186), exports);
-__exportStar(__nccwpck_require__(42133), exports);
-__exportStar(__nccwpck_require__(70808), exports);
-__exportStar(__nccwpck_require__(30720), exports);
-__exportStar(__nccwpck_require__(83345), exports);
-__exportStar(__nccwpck_require__(78767), exports);
-__exportStar(__nccwpck_require__(63851), exports);
-__exportStar(__nccwpck_require__(1805), exports);
-__exportStar(__nccwpck_require__(51275), exports);
-__exportStar(__nccwpck_require__(28491), exports);
-__exportStar(__nccwpck_require__(46893), exports);
-__exportStar(__nccwpck_require__(47632), exports);
-__exportStar(__nccwpck_require__(24256), exports);
-__exportStar(__nccwpck_require__(99945), exports);
-__exportStar(__nccwpck_require__(48938), exports);
-__exportStar(__nccwpck_require__(75329), exports);
-__exportStar(__nccwpck_require__(23281), exports);
-__exportStar(__nccwpck_require__(40551), exports);
-__exportStar(__nccwpck_require__(19615), exports);
-__exportStar(__nccwpck_require__(8082), exports);
-__exportStar(__nccwpck_require__(99698), exports);
 __exportStar(__nccwpck_require__(58492), exports);
-__exportStar(__nccwpck_require__(8737), exports);
-__exportStar(__nccwpck_require__(43053), exports);
-__exportStar(__nccwpck_require__(81197), exports);
-__exportStar(__nccwpck_require__(30068), exports);
-__exportStar(__nccwpck_require__(47629), exports);
+__exportStar(__nccwpck_require__(24998), exports);
+__exportStar(__nccwpck_require__(30854), exports);
+__exportStar(__nccwpck_require__(48624), exports);
+__exportStar(__nccwpck_require__(48938), exports);
+__exportStar(__nccwpck_require__(23281), exports);
+__exportStar(__nccwpck_require__(95911), exports);
+__exportStar(__nccwpck_require__(88416), exports);
+__exportStar(__nccwpck_require__(38869), exports);
+__exportStar(__nccwpck_require__(99186), exports);
+__exportStar(__nccwpck_require__(19186), exports);
+__exportStar(__nccwpck_require__(85590), exports);
+__exportStar(__nccwpck_require__(15495), exports);
+__exportStar(__nccwpck_require__(6795), exports);
+__exportStar(__nccwpck_require__(83345), exports);
+__exportStar(__nccwpck_require__(30720), exports);
+__exportStar(__nccwpck_require__(24887), exports);
+__exportStar(__nccwpck_require__(55270), exports);
 __exportStar(__nccwpck_require__(17190), exports);
-__exportStar(__nccwpck_require__(43504), exports);
-__exportStar(__nccwpck_require__(9128), exports);
-__exportStar(__nccwpck_require__(63615), exports);
-__exportStar(__nccwpck_require__(4678), exports);
-__exportStar(__nccwpck_require__(10082), exports);
-__exportStar(__nccwpck_require__(77076), exports);
-__exportStar(__nccwpck_require__(34967), exports);
-__exportStar(__nccwpck_require__(20747), exports);
-__exportStar(__nccwpck_require__(56132), exports);
+__exportStar(__nccwpck_require__(2560), exports);
 __exportStar(__nccwpck_require__(81029), exports);
-__exportStar(__nccwpck_require__(89521), exports);
-__exportStar(__nccwpck_require__(58711), exports);
-__exportStar(__nccwpck_require__(89424), exports);
+__exportStar(__nccwpck_require__(84026), exports);
+__exportStar(__nccwpck_require__(8082), exports);
+__exportStar(__nccwpck_require__(7798), exports);
+__exportStar(__nccwpck_require__(96164), exports);
+__exportStar(__nccwpck_require__(42760), exports);
 __exportStar(__nccwpck_require__(99227), exports);
 __exportStar(__nccwpck_require__(21629), exports);
 __exportStar(__nccwpck_require__(46119), exports);
-__exportStar(__nccwpck_require__(65430), exports);
+__exportStar(__nccwpck_require__(47479), exports);
 __exportStar(__nccwpck_require__(27230), exports);
-__exportStar(__nccwpck_require__(21456), exports);
-__exportStar(__nccwpck_require__(95392), exports);
-__exportStar(__nccwpck_require__(68798), exports);
-__exportStar(__nccwpck_require__(54978), exports);
 __exportStar(__nccwpck_require__(19805), exports);
-__exportStar(__nccwpck_require__(57569), exports);
-__exportStar(__nccwpck_require__(41876), exports);
 __exportStar(__nccwpck_require__(86808), exports);
 __exportStar(__nccwpck_require__(9329), exports);
 __exportStar(__nccwpck_require__(49274), exports);
-__exportStar(__nccwpck_require__(3661), exports);
-__exportStar(__nccwpck_require__(96947), exports);
-__exportStar(__nccwpck_require__(3392), exports);
-__exportStar(__nccwpck_require__(60628), exports);
-__exportStar(__nccwpck_require__(79307), exports);
-__exportStar(__nccwpck_require__(26137), exports);
-__exportStar(__nccwpck_require__(11165), exports);
-__exportStar(__nccwpck_require__(84764), exports);
-__exportStar(__nccwpck_require__(87978), exports);
-__exportStar(__nccwpck_require__(63294), exports);
-__exportStar(__nccwpck_require__(19420), exports);
 __exportStar(__nccwpck_require__(98881), exports);
-__exportStar(__nccwpck_require__(98216), exports);
-__exportStar(__nccwpck_require__(65090), exports);
-__exportStar(__nccwpck_require__(94199), exports);
-__exportStar(__nccwpck_require__(66453), exports);
-__exportStar(__nccwpck_require__(45822), exports);
-__exportStar(__nccwpck_require__(57469), exports);
-__exportStar(__nccwpck_require__(93656), exports);
-__exportStar(__nccwpck_require__(4469), exports);
-__exportStar(__nccwpck_require__(80662), exports);
-__exportStar(__nccwpck_require__(71563), exports);
-__exportStar(__nccwpck_require__(60888), exports);
-__exportStar(__nccwpck_require__(36883), exports);
-__exportStar(__nccwpck_require__(22687), exports);
-__exportStar(__nccwpck_require__(55591), exports);
-__exportStar(__nccwpck_require__(49433), exports);
-__exportStar(__nccwpck_require__(26322), exports);
-__exportStar(__nccwpck_require__(96432), exports);
-__exportStar(__nccwpck_require__(45784), exports);
-__exportStar(__nccwpck_require__(37199), exports);
-__exportStar(__nccwpck_require__(26161), exports);
-__exportStar(__nccwpck_require__(68456), exports);
-__exportStar(__nccwpck_require__(26290), exports);
-__exportStar(__nccwpck_require__(20178), exports);
-__exportStar(__nccwpck_require__(73622), exports);
-__exportStar(__nccwpck_require__(29697), exports);
-__exportStar(__nccwpck_require__(32014), exports);
-__exportStar(__nccwpck_require__(28364), exports);
-__exportStar(__nccwpck_require__(24701), exports);
-__exportStar(__nccwpck_require__(31932), exports);
+__exportStar(__nccwpck_require__(19420), exports);
+__exportStar(__nccwpck_require__(7251), exports);
+__exportStar(__nccwpck_require__(30068), exports);
+__exportStar(__nccwpck_require__(47629), exports);
+__exportStar(__nccwpck_require__(63851), exports);
+__exportStar(__nccwpck_require__(47632), exports);
+__exportStar(__nccwpck_require__(99945), exports);
+__exportStar(__nccwpck_require__(23188), exports);
+__exportStar(__nccwpck_require__(42714), exports);
 __exportStar(__nccwpck_require__(94561), exports);
-__exportStar(__nccwpck_require__(85546), exports);
-__exportStar(__nccwpck_require__(13358), exports);
-__exportStar(__nccwpck_require__(50846), exports);
-__exportStar(__nccwpck_require__(47008), exports);
-__exportStar(__nccwpck_require__(2224), exports);
-__exportStar(__nccwpck_require__(52338), exports);
+__exportStar(__nccwpck_require__(68456), exports);
 __exportStar(__nccwpck_require__(42519), exports);
-__exportStar(__nccwpck_require__(71129), exports);
-__exportStar(__nccwpck_require__(65277), exports);
-__exportStar(__nccwpck_require__(30674), exports);
-__exportStar(__nccwpck_require__(93013), exports);
-__exportStar(__nccwpck_require__(87266), exports);
 __exportStar(__nccwpck_require__(15131), exports);
-__exportStar(__nccwpck_require__(74809), exports);
-__exportStar(__nccwpck_require__(80828), exports);
-__exportStar(__nccwpck_require__(39679), exports);
-__exportStar(__nccwpck_require__(73059), exports);
-__exportStar(__nccwpck_require__(16159), exports);
-__exportStar(__nccwpck_require__(1145), exports);
-__exportStar(__nccwpck_require__(23606), exports);
+__exportStar(__nccwpck_require__(28364), exports);
+__exportStar(__nccwpck_require__(50846), exports);
+__exportStar(__nccwpck_require__(71563), exports);
+__exportStar(__nccwpck_require__(49433), exports);
+__exportStar(__nccwpck_require__(36883), exports);
+__exportStar(__nccwpck_require__(29835), exports);
+__exportStar(__nccwpck_require__(39428), exports);
+__exportStar(__nccwpck_require__(19992), exports);
+__exportStar(__nccwpck_require__(22559), exports);
+__exportStar(__nccwpck_require__(30115), exports);
+__exportStar(__nccwpck_require__(77233), exports);
+__exportStar(__nccwpck_require__(28491), exports);
+__exportStar(__nccwpck_require__(97174), exports);
+__exportStar(__nccwpck_require__(10082), exports);
+__exportStar(__nccwpck_require__(56132), exports);
+__exportStar(__nccwpck_require__(46893), exports);
+__exportStar(__nccwpck_require__(454), exports);
+__exportStar(__nccwpck_require__(29866), exports);
+__exportStar(__nccwpck_require__(86745), exports);
+__exportStar(__nccwpck_require__(69620), exports);
 __exportStar(__nccwpck_require__(66291), exports);
-__exportStar(__nccwpck_require__(43022), exports);
+__exportStar(__nccwpck_require__(93656), exports);
+__exportStar(__nccwpck_require__(66453), exports);
 __exportStar(__nccwpck_require__(13579), exports);
+__exportStar(__nccwpck_require__(97025), exports);
+__exportStar(__nccwpck_require__(43487), exports);
+__exportStar(__nccwpck_require__(41675), exports);
+__exportStar(__nccwpck_require__(9778), exports);
+__exportStar(__nccwpck_require__(15816), exports);
+__exportStar(__nccwpck_require__(50550), exports);
 __exportStar(__nccwpck_require__(56470), exports);
+__exportStar(__nccwpck_require__(60829), exports);
+__exportStar(__nccwpck_require__(43053), exports);
+__exportStar(__nccwpck_require__(20747), exports);
+__exportStar(__nccwpck_require__(95392), exports);
+__exportStar(__nccwpck_require__(18900), exports);
+__exportStar(__nccwpck_require__(53486), exports);
+__exportStar(__nccwpck_require__(77694), exports);
+__exportStar(__nccwpck_require__(63615), exports);
+__exportStar(__nccwpck_require__(33042), exports);
+__exportStar(__nccwpck_require__(33766), exports);
+__exportStar(__nccwpck_require__(76869), exports);
+__exportStar(__nccwpck_require__(89288), exports);
+__exportStar(__nccwpck_require__(41876), exports);
+__exportStar(__nccwpck_require__(26417), exports);
+__exportStar(__nccwpck_require__(88306), exports);
+__exportStar(__nccwpck_require__(44747), exports);
+__exportStar(__nccwpck_require__(59889), exports);
+__exportStar(__nccwpck_require__(26109), exports);
+__exportStar(__nccwpck_require__(88868), exports);
+__exportStar(__nccwpck_require__(81931), exports);
+__exportStar(__nccwpck_require__(8787), exports);
+__exportStar(__nccwpck_require__(55197), exports);
+__exportStar(__nccwpck_require__(32649), exports);
+__exportStar(__nccwpck_require__(79051), exports);
+__exportStar(__nccwpck_require__(4848), exports);
+__exportStar(__nccwpck_require__(26378), exports);
+__exportStar(__nccwpck_require__(62608), exports);
+__exportStar(__nccwpck_require__(47502), exports);
+__exportStar(__nccwpck_require__(10391), exports);
+__exportStar(__nccwpck_require__(71633), exports);
+__exportStar(__nccwpck_require__(45953), exports);
+__exportStar(__nccwpck_require__(81233), exports);
+__exportStar(__nccwpck_require__(57569), exports);
+__exportStar(__nccwpck_require__(98216), exports);
+__exportStar(__nccwpck_require__(74809), exports);
+__exportStar(__nccwpck_require__(24701), exports);
+__exportStar(__nccwpck_require__(85755), exports);
+__exportStar(__nccwpck_require__(74176), exports);
+__exportStar(__nccwpck_require__(25315), exports);
+__exportStar(__nccwpck_require__(76543), exports);
+__exportStar(__nccwpck_require__(41902), exports);
+__exportStar(__nccwpck_require__(82482), exports);
+__exportStar(__nccwpck_require__(58430), exports);
+__exportStar(__nccwpck_require__(45137), exports);
+__exportStar(__nccwpck_require__(70537), exports);
+__exportStar(__nccwpck_require__(18276), exports);
+__exportStar(__nccwpck_require__(73015), exports);
+__exportStar(__nccwpck_require__(34761), exports);
+__exportStar(__nccwpck_require__(71572), exports);
+__exportStar(__nccwpck_require__(29697), exports);
+__exportStar(__nccwpck_require__(93013), exports);
+__exportStar(__nccwpck_require__(73059), exports);
+__exportStar(__nccwpck_require__(95938), exports);
+__exportStar(__nccwpck_require__(55813), exports);
+__exportStar(__nccwpck_require__(64239), exports);
+__exportStar(__nccwpck_require__(25232), exports);
+__exportStar(__nccwpck_require__(65036), exports);
+__exportStar(__nccwpck_require__(57761), exports);
+__exportStar(__nccwpck_require__(72924), exports);
+__exportStar(__nccwpck_require__(29295), exports);
+__exportStar(__nccwpck_require__(51149), exports);
+__exportStar(__nccwpck_require__(8737), exports);
+__exportStar(__nccwpck_require__(75329), exports);
+__exportStar(__nccwpck_require__(82941), exports);
+__exportStar(__nccwpck_require__(36215), exports);
+__exportStar(__nccwpck_require__(61030), exports);
+__exportStar(__nccwpck_require__(58711), exports);
+__exportStar(__nccwpck_require__(1805), exports);
+__exportStar(__nccwpck_require__(85546), exports);
+__exportStar(__nccwpck_require__(26290), exports);
+__exportStar(__nccwpck_require__(71129), exports);
+__exportStar(__nccwpck_require__(96432), exports);
+__exportStar(__nccwpck_require__(22687), exports);
+__exportStar(__nccwpck_require__(93845), exports);
+__exportStar(__nccwpck_require__(81197), exports);
 //# sourceMappingURL=index.js.map
 
 /***/ }),
@@ -29696,6 +30440,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 //# sourceMappingURL=partialUpdateProjectRole.js.map
+
+/***/ }),
+
+/***/ 69620:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=publishDraftWorkflowScheme.js.map
 
 /***/ }),
 
@@ -30229,6 +30983,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 /***/ }),
 
+/***/ 58430:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=updateCustomFieldConfiguration.js.map
+
+/***/ }),
+
 /***/ 45137:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -30578,7 +31342,9 @@ class PermissionSchemes {
                     expand: parameters === null || parameters === void 0 ? void 0 : parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.permissionSchemes.getAllPermissionSchemes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.permissionSchemes.getAllPermissionSchemes',
+            });
         });
     }
     createPermissionScheme(parameters, callback) {
@@ -30591,7 +31357,9 @@ class PermissionSchemes {
                 },
                 data: Object.assign(Object.assign({}, parameters), { expand: undefined }),
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.permissionSchemes.createPermissionScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.permissionSchemes.createPermissionScheme',
+            });
         });
     }
     getPermissionScheme(parameters, callback) {
@@ -30616,7 +31384,9 @@ class PermissionSchemes {
                 },
                 data: Object.assign(Object.assign({}, parameters), { schemeId: undefined, expand: undefined }),
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.permissionSchemes.updatePermissionScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.permissionSchemes.updatePermissionScheme',
+            });
         });
     }
     deletePermissionScheme(parameters, callback) {
@@ -30625,7 +31395,9 @@ class PermissionSchemes {
                 url: `/rest/api/2/permissionscheme/${parameters.schemeId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.permissionSchemes.deletePermissionScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.permissionSchemes.deletePermissionScheme',
+            });
         });
     }
     getPermissionSchemeGrants(parameters, callback) {
@@ -30637,7 +31409,9 @@ class PermissionSchemes {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.permissionSchemes.getPermissionSchemeGrants' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.permissionSchemes.getPermissionSchemeGrants',
+            });
         });
     }
     createPermissionGrant(parameters, callback) {
@@ -30655,7 +31429,9 @@ class PermissionSchemes {
                     permission: parameters.permission,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.permissionSchemes.createPermissionGrant' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.permissionSchemes.createPermissionGrant',
+            });
         });
     }
     getPermissionSchemeGrant(parameters, callback) {
@@ -30667,7 +31443,9 @@ class PermissionSchemes {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.permissionSchemes.getPermissionSchemeGrant' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.permissionSchemes.getPermissionSchemeGrant',
+            });
         });
     }
     deletePermissionSchemeEntity(parameters, callback) {
@@ -30676,7 +31454,9 @@ class PermissionSchemes {
                 url: `/rest/api/2/permissionscheme/${parameters.schemeId}/permission/${parameters.permissionId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.permissionSchemes.deletePermissionSchemeEntity' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.permissionSchemes.deletePermissionSchemeEntity',
+            });
         });
     }
 }
@@ -30866,7 +31646,9 @@ class ProjectCategories {
                 url: '/rest/api/2/projectCategory',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectCategories.getAllProjectCategories' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectCategories.getAllProjectCategories',
+            });
         });
     }
     createProjectCategory(parameters, callback) {
@@ -30881,7 +31663,9 @@ class ProjectCategories {
                     description: parameters === null || parameters === void 0 ? void 0 : parameters.description,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectCategories.createProjectCategory' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectCategories.createProjectCategory',
+            });
         });
     }
     getProjectCategoryById(parameters, callback) {
@@ -30890,7 +31674,9 @@ class ProjectCategories {
                 url: `/rest/api/2/projectCategory/${parameters.id}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectCategories.getProjectCategoryById' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectCategories.getProjectCategoryById',
+            });
         });
     }
     updateProjectCategory(parameters, callback) {
@@ -30903,7 +31689,9 @@ class ProjectCategories {
                     description: parameters.description,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectCategories.updateProjectCategory' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectCategories.updateProjectCategory',
+            });
         });
     }
     removeProjectCategory(parameters, callback) {
@@ -30912,7 +31700,9 @@ class ProjectCategories {
                 url: `/rest/api/2/projectCategory/${parameters.id}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectCategories.removeProjectCategory' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectCategories.removeProjectCategory',
+            });
         });
     }
 }
@@ -31010,7 +31800,9 @@ class ProjectComponents {
                 url: `/rest/api/2/component/${parameters.id}/relatedIssueCounts`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectComponents.getComponentRelatedIssues' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectComponents.getComponentRelatedIssues',
+            });
         });
     }
     getProjectComponentsPaginated(parameters, callback) {
@@ -31025,7 +31817,9 @@ class ProjectComponents {
                     query: parameters.query,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectComponents.getProjectComponentsPaginated' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectComponents.getProjectComponentsPaginated',
+            });
         });
     }
     getProjectComponents(parameters, callback) {
@@ -31128,7 +31922,9 @@ class ProjectFeatures {
                     state: parameters.state,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectFeatures.toggleFeatureForProject' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectFeatures.toggleFeatureForProject',
+            });
         });
     }
 }
@@ -31166,7 +31962,9 @@ class ProjectKeyAndNameValidation {
                     key: parameters === null || parameters === void 0 ? void 0 : parameters.key,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectKeyAndNameValidation.validateProjectKey' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectKeyAndNameValidation.validateProjectKey',
+            });
         });
     }
     getValidProjectKey(parameters, callback) {
@@ -31178,7 +31976,9 @@ class ProjectKeyAndNameValidation {
                     key: parameters === null || parameters === void 0 ? void 0 : parameters.key,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectKeyAndNameValidation.getValidProjectKey' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectKeyAndNameValidation.getValidProjectKey',
+            });
         });
     }
     getValidProjectName(parameters, callback) {
@@ -31190,7 +31990,9 @@ class ProjectKeyAndNameValidation {
                     name: parameters.name,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectKeyAndNameValidation.getValidProjectName' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectKeyAndNameValidation.getValidProjectName',
+            });
         });
     }
 }
@@ -31225,7 +32027,9 @@ class ProjectPermissionSchemes {
                 url: `/rest/api/2/project/${parameters.projectKeyOrId}/issuesecuritylevelscheme`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectPermissionSchemes.getProjectIssueSecurityScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectPermissionSchemes.getProjectIssueSecurityScheme',
+            });
         });
     }
     getAssignedPermissionScheme(parameters, callback) {
@@ -31237,7 +32041,9 @@ class ProjectPermissionSchemes {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectPermissionSchemes.getAssignedPermissionScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectPermissionSchemes.getAssignedPermissionScheme',
+            });
         });
     }
     assignPermissionScheme(parameters, callback) {
@@ -31252,7 +32058,9 @@ class ProjectPermissionSchemes {
                     id: parameters.id,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectPermissionSchemes.assignPermissionScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectPermissionSchemes.assignPermissionScheme',
+            });
         });
     }
     getSecurityLevelsForProject(parameters, callback) {
@@ -31261,7 +32069,9 @@ class ProjectPermissionSchemes {
                 url: `/rest/api/2/project/${parameters.projectKeyOrId}/securitylevel`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectPermissionSchemes.getSecurityLevelsForProject' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectPermissionSchemes.getSecurityLevelsForProject',
+            });
         });
     }
 }
@@ -31296,7 +32106,9 @@ class ProjectProperties {
                 url: `/rest/api/2/project/${parameters.projectIdOrKey}/properties`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectProperties.getProjectPropertyKeys' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectProperties.getProjectPropertyKeys',
+            });
         });
     }
     getProjectProperty(parameters, callback) {
@@ -31323,7 +32135,9 @@ class ProjectProperties {
                 url: `/rest/api/2/project/${parameters.projectIdOrKey}/properties/${parameters.propertyKey}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectProperties.deleteProjectProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectProperties.deleteProjectProperty',
+            });
         });
     }
 }
@@ -31396,7 +32210,9 @@ class ProjectRoleActors {
                 url: `/rest/api/2/role/${parameters.id}/actors`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectRoleActors.getProjectRoleActorsForRole' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectRoleActors.getProjectRoleActorsForRole',
+            });
         });
     }
     addProjectRoleActorsToRole(parameters, callback) {
@@ -31409,7 +32225,9 @@ class ProjectRoleActors {
                     group: parameters.group,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectRoleActors.addProjectRoleActorsToRole' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectRoleActors.addProjectRoleActorsToRole',
+            });
         });
     }
     deleteProjectRoleActorsFromRole(parameters, callback) {
@@ -31422,7 +32240,9 @@ class ProjectRoleActors {
                     group: parameters.group,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectRoleActors.deleteProjectRoleActorsFromRole' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectRoleActors.deleteProjectRoleActorsFromRole',
+            });
         });
     }
 }
@@ -31592,7 +32412,9 @@ class ProjectTypes {
                 url: '/rest/api/2/project/type/accessible',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectTypes.getAllAccessibleProjectTypes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectTypes.getAllAccessibleProjectTypes',
+            });
         });
     }
     getProjectTypeByKey(parameters, callback) {
@@ -31610,7 +32432,9 @@ class ProjectTypes {
                 url: `/rest/api/2/project/type/${parameters.projectTypeKey}/accessible`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectTypes.getAccessibleProjectTypeByKey' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectTypes.getAccessibleProjectTypeByKey',
+            });
         });
     }
 }
@@ -31653,7 +32477,9 @@ class ProjectVersions {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectVersions.getProjectVersionsPaginated' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectVersions.getProjectVersionsPaginated',
+            });
         });
     }
     getProjectVersions(parameters, callback) {
@@ -31770,7 +32596,9 @@ class ProjectVersions {
                 url: `/rest/api/2/version/${parameters.id}/relatedIssueCounts`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectVersions.getVersionRelatedIssues' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectVersions.getVersionRelatedIssues',
+            });
         });
     }
     deleteAndReplaceVersion(parameters, callback) {
@@ -31784,7 +32612,9 @@ class ProjectVersions {
                     customFieldReplacementList: parameters.customFieldReplacementList,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectVersions.deleteAndReplaceVersion' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectVersions.deleteAndReplaceVersion',
+            });
         });
     }
     getVersionUnresolvedIssues(parameters, callback) {
@@ -31793,7 +32623,9 @@ class ProjectVersions {
                 url: `/rest/api/2/version/${parameters.id}/unresolvedIssueCount`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projectVersions.getVersionUnresolvedIssues' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projectVersions.getVersionUnresolvedIssues',
+            });
         });
     }
 }
@@ -31844,8 +32676,6 @@ class Projects {
                 data: {
                     key: parameters === null || parameters === void 0 ? void 0 : parameters.key,
                     name: parameters === null || parameters === void 0 ? void 0 : parameters.name,
-                    projectTypeKey: parameters === null || parameters === void 0 ? void 0 : parameters.projectTypeKey,
-                    projectTemplateKey: parameters === null || parameters === void 0 ? void 0 : parameters.projectTemplateKey,
                     description: parameters === null || parameters === void 0 ? void 0 : parameters.description,
                     lead: parameters === null || parameters === void 0 ? void 0 : parameters.lead,
                     leadAccountId: parameters === null || parameters === void 0 ? void 0 : parameters.leadAccountId,
@@ -31856,6 +32686,12 @@ class Projects {
                     permissionScheme: parameters === null || parameters === void 0 ? void 0 : parameters.permissionScheme,
                     notificationScheme: parameters === null || parameters === void 0 ? void 0 : parameters.notificationScheme,
                     categoryId: parameters === null || parameters === void 0 ? void 0 : parameters.categoryId,
+                    projectTypeKey: parameters === null || parameters === void 0 ? void 0 : parameters.projectTypeKey,
+                    projectTemplateKey: parameters === null || parameters === void 0 ? void 0 : parameters.projectTemplateKey,
+                    workflowScheme: parameters === null || parameters === void 0 ? void 0 : parameters.workflowScheme,
+                    issueTypeScreenScheme: parameters === null || parameters === void 0 ? void 0 : parameters.issueTypeScreenScheme,
+                    issueTypeScheme: parameters === null || parameters === void 0 ? void 0 : parameters.issueTypeScheme,
+                    fieldConfigurationScheme: parameters === null || parameters === void 0 ? void 0 : parameters.fieldConfigurationScheme,
                 },
             };
             return this.client.sendRequest(config, callback, { methodName: 'version2.projects.createProject' });
@@ -31870,12 +32706,15 @@ class Projects {
                     startAt: parameters === null || parameters === void 0 ? void 0 : parameters.startAt,
                     maxResults: parameters === null || parameters === void 0 ? void 0 : parameters.maxResults,
                     orderBy: parameters === null || parameters === void 0 ? void 0 : parameters.orderBy,
+                    id: parameters === null || parameters === void 0 ? void 0 : parameters.id,
                     query: parameters === null || parameters === void 0 ? void 0 : parameters.query,
                     typeKey: parameters === null || parameters === void 0 ? void 0 : parameters.typeKey,
                     categoryId: parameters === null || parameters === void 0 ? void 0 : parameters.categoryId,
                     action: parameters === null || parameters === void 0 ? void 0 : parameters.action,
                     expand: parameters === null || parameters === void 0 ? void 0 : parameters.expand,
                     status: parameters === null || parameters === void 0 ? void 0 : parameters.status,
+                    properties: parameters === null || parameters === void 0 ? void 0 : parameters.properties,
+                    propertyQuery: parameters === null || parameters === void 0 ? void 0 : parameters.propertyQuery,
                 },
             };
             return this.client.sendRequest(config, callback, { methodName: 'version2.projects.searchProjects' });
@@ -31997,7 +32836,9 @@ class Projects {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.projects.getNotificationSchemeForProject' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.projects.getNotificationSchemeForProject',
+            });
         });
     }
 }
@@ -32449,7 +33290,9 @@ class TimeTracking {
                 url: '/rest/api/2/configuration/timetracking',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.timeTracking.getSelectedTimeTrackingImplementation' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.timeTracking.getSelectedTimeTrackingImplementation',
+            });
         });
     }
     selectTimeTrackingImplementation(parameters, callback) {
@@ -32463,7 +33306,9 @@ class TimeTracking {
                     url: parameters === null || parameters === void 0 ? void 0 : parameters.url,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.timeTracking.selectTimeTrackingImplementation' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.timeTracking.selectTimeTrackingImplementation',
+            });
         });
     }
     getAvailableTimeTrackingImplementations(callback) {
@@ -32472,7 +33317,9 @@ class TimeTracking {
                 url: '/rest/api/2/configuration/timetracking/list',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.timeTracking.getAvailableTimeTrackingImplementations' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.timeTracking.getAvailableTimeTrackingImplementations',
+            });
         });
     }
     getSharedTimeTrackingConfiguration(callback) {
@@ -32481,7 +33328,9 @@ class TimeTracking {
                 url: '/rest/api/2/configuration/timetracking/options',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.timeTracking.getSharedTimeTrackingConfiguration' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.timeTracking.getSharedTimeTrackingConfiguration',
+            });
         });
     }
     setSharedTimeTrackingConfiguration(parameters, callback) {
@@ -32496,7 +33345,9 @@ class TimeTracking {
                     defaultUnit: parameters === null || parameters === void 0 ? void 0 : parameters.defaultUnit,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.timeTracking.setSharedTimeTrackingConfiguration' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.timeTracking.setSharedTimeTrackingConfiguration',
+            });
         });
     }
 }
@@ -32742,7 +33593,9 @@ class UserSearch {
                     maxResults: parameters === null || parameters === void 0 ? void 0 : parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.userSearch.findUsersWithBrowsePermission' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.userSearch.findUsersWithBrowsePermission',
+            });
         });
     }
 }
@@ -33073,7 +33926,9 @@ class WorkflowSchemeDrafts {
                 url: `/rest/api/2/workflowscheme/${parameters.id}/createdraft`,
                 method: 'POST',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemeDrafts.createWorkflowSchemeDraftFromParent' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemeDrafts.createWorkflowSchemeDraftFromParent',
+            });
         });
     }
     getWorkflowSchemeDraft(parameters, callback) {
@@ -33082,7 +33937,9 @@ class WorkflowSchemeDrafts {
                 url: `/rest/api/2/workflowscheme/${parameters.id}/draft`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemeDrafts.getWorkflowSchemeDraft' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemeDrafts.getWorkflowSchemeDraft',
+            });
         });
     }
     updateWorkflowSchemeDraft(parameters, callback) {
@@ -33098,7 +33955,9 @@ class WorkflowSchemeDrafts {
                     updateDraftIfNeeded: parameters.updateDraftIfNeeded,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemeDrafts.updateWorkflowSchemeDraft' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemeDrafts.updateWorkflowSchemeDraft',
+            });
         });
     }
     deleteWorkflowSchemeDraft(parameters, callback) {
@@ -33107,7 +33966,9 @@ class WorkflowSchemeDrafts {
                 url: `/rest/api/2/workflowscheme/${parameters.id}/draft`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemeDrafts.deleteWorkflowSchemeDraft' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemeDrafts.deleteWorkflowSchemeDraft',
+            });
         });
     }
     getDraftDefaultWorkflow(parameters, callback) {
@@ -33116,7 +33977,9 @@ class WorkflowSchemeDrafts {
                 url: `/rest/api/2/workflowscheme/${parameters.id}/draft/default`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemeDrafts.getDraftDefaultWorkflow' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemeDrafts.getDraftDefaultWorkflow',
+            });
         });
     }
     updateDraftDefaultWorkflow(parameters, callback) {
@@ -33129,7 +33992,9 @@ class WorkflowSchemeDrafts {
                     updateDraftIfNeeded: parameters.updateDraftIfNeeded,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemeDrafts.updateDraftDefaultWorkflow' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemeDrafts.updateDraftDefaultWorkflow',
+            });
         });
     }
     deleteDraftDefaultWorkflow(parameters, callback) {
@@ -33138,7 +34003,9 @@ class WorkflowSchemeDrafts {
                 url: `/rest/api/2/workflowscheme/${parameters.id}/draft/default`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemeDrafts.deleteDraftDefaultWorkflow' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemeDrafts.deleteDraftDefaultWorkflow',
+            });
         });
     }
     getWorkflowSchemeDraftIssueType(parameters, callback) {
@@ -33147,7 +34014,9 @@ class WorkflowSchemeDrafts {
                 url: `/rest/api/2/workflowscheme/${parameters.id}/draft/issuetype/${parameters.issueType}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemeDrafts.getWorkflowSchemeDraftIssueType' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemeDrafts.getWorkflowSchemeDraftIssueType',
+            });
         });
     }
     setWorkflowSchemeDraftIssueType(parameters, callback) {
@@ -33157,7 +34026,9 @@ class WorkflowSchemeDrafts {
                 method: 'PUT',
                 data: parameters.body,
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemeDrafts.setWorkflowSchemeDraftIssueType' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemeDrafts.setWorkflowSchemeDraftIssueType',
+            });
         });
     }
     deleteWorkflowSchemeDraftIssueType(parameters, callback) {
@@ -33166,7 +34037,26 @@ class WorkflowSchemeDrafts {
                 url: `/rest/api/2/workflowscheme/${parameters.id}/draft/issuetype/${parameters.issueType}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemeDrafts.deleteWorkflowSchemeDraftIssueType' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemeDrafts.deleteWorkflowSchemeDraftIssueType',
+            });
+        });
+    }
+    publishDraftWorkflowScheme(parameters, callback) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const config = {
+                url: `/rest/api/2/workflowscheme/${parameters.id}/draft/publish`,
+                method: 'POST',
+                params: {
+                    validateOnly: parameters.validateOnly,
+                },
+                data: {
+                    statusMappings: parameters.statusMappings,
+                },
+            };
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemeDrafts.publishDraftWorkflowScheme',
+            });
         });
     }
     getDraftWorkflow(parameters, callback) {
@@ -33196,7 +34086,9 @@ class WorkflowSchemeDrafts {
                     updateDraftIfNeeded: parameters.updateDraftIfNeeded,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemeDrafts.updateDraftWorkflowMapping' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemeDrafts.updateDraftWorkflowMapping',
+            });
         });
     }
     deleteDraftWorkflowMapping(parameters, callback) {
@@ -33208,7 +34100,9 @@ class WorkflowSchemeDrafts {
                     workflowName: parameters.workflowName,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemeDrafts.deleteDraftWorkflowMapping' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemeDrafts.deleteDraftWorkflowMapping',
+            });
         });
     }
 }
@@ -33246,7 +34140,9 @@ class WorkflowSchemeProjectAssociations {
                     projectId: parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemeProjectAssociations.getWorkflowSchemeProjectAssociations' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemeProjectAssociations.getWorkflowSchemeProjectAssociations',
+            });
         });
     }
     associateSchemeWithProject(parameters, callback) {
@@ -33265,7 +34161,9 @@ class WorkflowSchemeProjectAssociations {
                     projectId: parameters === null || parameters === void 0 ? void 0 : parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemeProjectAssociations.assignSchemeToProject' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemeProjectAssociations.assignSchemeToProject',
+            });
         });
     }
 }
@@ -33414,7 +34312,9 @@ class WorkflowSchemes {
                     returnDraftIfExists: parameters.returnDraftIfExists,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemes.getWorkflowSchemeIssueType' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemes.getWorkflowSchemeIssueType',
+            });
         });
     }
     setWorkflowSchemeIssueType(parameters, callback) {
@@ -33424,7 +34324,9 @@ class WorkflowSchemes {
                 method: 'PUT',
                 data: parameters.body,
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemes.setWorkflowSchemeIssueType' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemes.setWorkflowSchemeIssueType',
+            });
         });
     }
     deleteWorkflowSchemeIssueType(parameters, callback) {
@@ -33436,7 +34338,9 @@ class WorkflowSchemes {
                     updateDraftIfNeeded: parameters.updateDraftIfNeeded,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowSchemes.deleteWorkflowSchemeIssueType' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowSchemes.deleteWorkflowSchemeIssueType',
+            });
         });
     }
     getWorkflow(parameters, callback) {
@@ -33515,7 +34419,9 @@ class WorkflowStatusCategories {
                 url: '/rest/api/2/statuscategory',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowStatusCategories.getStatusCategories' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowStatusCategories.getStatusCategories',
+            });
         });
     }
     getStatusCategory(parameters, callback) {
@@ -33524,7 +34430,9 @@ class WorkflowStatusCategories {
                 url: `/rest/api/2/statuscategory/${parameters.idOrKey}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowStatusCategories.getStatusCategory' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowStatusCategories.getStatusCategory',
+            });
         });
     }
 }
@@ -33609,7 +34517,9 @@ class WorkflowTransitionProperties {
                     workflowMode: parameters.workflowMode,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowTransitionProperties.getWorkflowTransitionProperties' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowTransitionProperties.getWorkflowTransitionProperties',
+            });
         });
     }
     createWorkflowTransitionProperty(parameters, callback) {
@@ -33624,7 +34534,9 @@ class WorkflowTransitionProperties {
                 },
                 data: Object.assign(Object.assign({}, parameters), { transitionId: undefined, key: undefined, workflowName: undefined, workflowMode: undefined }),
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowTransitionProperties.createWorkflowTransitionProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowTransitionProperties.createWorkflowTransitionProperty',
+            });
         });
     }
     updateWorkflowTransitionProperty(parameters, callback) {
@@ -33639,7 +34551,9 @@ class WorkflowTransitionProperties {
                 },
                 data: Object.assign(Object.assign({}, parameters), { transitionId: undefined, key: undefined, workflowName: undefined, workflowMode: undefined }),
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowTransitionProperties.updateWorkflowTransitionProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowTransitionProperties.updateWorkflowTransitionProperty',
+            });
         });
     }
     deleteWorkflowTransitionProperty(parameters, callback) {
@@ -33653,7 +34567,9 @@ class WorkflowTransitionProperties {
                     workflowMode: parameters.workflowMode,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowTransitionProperties.deleteWorkflowTransitionProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowTransitionProperties.deleteWorkflowTransitionProperty',
+            });
         });
     }
 }
@@ -33695,7 +34611,9 @@ class WorkflowTransitionRules {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowTransitionRules.getWorkflowTransitionRuleConfigurations' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowTransitionRules.getWorkflowTransitionRuleConfigurations',
+            });
         });
     }
     updateWorkflowTransitionRuleConfigurations(parameters, callback) {
@@ -33707,7 +34625,9 @@ class WorkflowTransitionRules {
                     workflows: parameters === null || parameters === void 0 ? void 0 : parameters.workflows,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowTransitionRules.updateWorkflowTransitionRuleConfigurations' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowTransitionRules.updateWorkflowTransitionRuleConfigurations',
+            });
         });
     }
     deleteWorkflowTransitionRuleConfigurations(parameters, callback) {
@@ -33719,7 +34639,9 @@ class WorkflowTransitionRules {
                     workflows: parameters === null || parameters === void 0 ? void 0 : parameters.workflows,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version2.workflowTransitionRules.deleteWorkflowTransitionRuleConfigurations' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version2.workflowTransitionRules.deleteWorkflowTransitionRuleConfigurations',
+            });
         });
     }
 }
@@ -33893,7 +34815,9 @@ class ApplicationRoles {
                 url: '/rest/api/3/applicationrole',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.applicationRoles.getAllApplicationRoles' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.applicationRoles.getAllApplicationRoles',
+            });
         });
     }
     getApplicationRole(parameters, callback) {
@@ -34067,6 +34991,7 @@ class Version3Client extends clients_1.BaseClient {
         this.issueAttachments = new __1.IssueAttachments(this);
         this.issueCommentProperties = new __1.IssueCommentProperties(this);
         this.issueComments = new __1.IssueComments(this);
+        this.issueCustomFieldConfigurationApps = new __1.IssueCustomFieldConfigurationApps(this);
         this.issueCustomFieldContexts = new __1.IssueCustomFieldContexts(this);
         this.issueCustomFieldOptions = new __1.IssueCustomFieldOptions(this);
         this.issueCustomFieldOptionsApps = new __1.IssueCustomFieldOptionsApps(this);
@@ -34213,7 +35138,9 @@ class Dashboards {
                 url: `/rest/api/3/dashboard/${parameters.dashboardId}/items/${parameters.itemId}/properties`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.dashboards.getDashboardItemPropertyKeys' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.dashboards.getDashboardItemPropertyKeys',
+            });
         });
     }
     getDashboardItemProperty(parameters, callback) {
@@ -34860,6 +35787,7 @@ __exportStar(__nccwpck_require__(70933), exports);
 __exportStar(__nccwpck_require__(53375), exports);
 __exportStar(__nccwpck_require__(28740), exports);
 __exportStar(__nccwpck_require__(64078), exports);
+__exportStar(__nccwpck_require__(45007), exports);
 __exportStar(__nccwpck_require__(55423), exports);
 __exportStar(__nccwpck_require__(60151), exports);
 __exportStar(__nccwpck_require__(54537), exports);
@@ -35021,7 +35949,9 @@ class IssueAttachments {
                 url: `/rest/api/3/attachment/${parameters.id}/expand/human`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueAttachments.expandAttachmentForHumans' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueAttachments.expandAttachmentForHumans',
+            });
         });
     }
     expandAttachmentForMachines(parameters, callback) {
@@ -35030,7 +35960,9 @@ class IssueAttachments {
                 url: `/rest/api/3/attachment/${parameters.id}/expand/raw`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueAttachments.expandAttachmentForMachines' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueAttachments.expandAttachmentForMachines',
+            });
         });
     }
     addAttachment(parameters, callback) {
@@ -35080,7 +36012,9 @@ class IssueCommentProperties {
                 url: `/rest/api/3/comment/${parameters.commentId}/properties`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCommentProperties.getCommentPropertyKeys' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCommentProperties.getCommentPropertyKeys',
+            });
         });
     }
     getCommentProperty(parameters, callback) {
@@ -35089,7 +36023,9 @@ class IssueCommentProperties {
                 url: `/rest/api/3/comment/${parameters.commentId}/properties/${parameters.propertyKey}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCommentProperties.getCommentProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCommentProperties.getCommentProperty',
+            });
         });
     }
     setCommentProperty(parameters, callback) {
@@ -35098,7 +36034,9 @@ class IssueCommentProperties {
                 url: `/rest/api/3/comment/${parameters.commentId}/properties/${parameters.propertyKey}`,
                 method: 'PUT',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCommentProperties.setCommentProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCommentProperties.setCommentProperty',
+            });
         });
     }
     deleteCommentProperty(parameters, callback) {
@@ -35107,7 +36045,9 @@ class IssueCommentProperties {
                 url: `/rest/api/3/comment/${parameters.commentId}/properties/${parameters.propertyKey}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCommentProperties.deleteCommentProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCommentProperties.deleteCommentProperty',
+            });
         });
     }
 }
@@ -35231,6 +36171,63 @@ exports.IssueComments = IssueComments;
 
 /***/ }),
 
+/***/ 45007:
+/***/ (function(__unused_webpack_module, exports) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.IssueCustomFieldConfigurationApps = void 0;
+class IssueCustomFieldConfigurationApps {
+    constructor(client) {
+        this.client = client;
+    }
+    getCustomFieldConfiguration(parameters, callback) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const config = {
+                url: `/rest/api/3/app/field/${parameters.fieldIdOrKey}/context/configuration`,
+                method: 'GET',
+                params: {
+                    contextId: parameters.contextId,
+                    issueId: parameters.issueId,
+                    startAt: parameters.startAt,
+                    maxResults: parameters.maxResults,
+                },
+            };
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldConfigurationApps.getCustomFieldConfiguration',
+            });
+        });
+    }
+    updateCustomFieldConfiguration(parameters, callback) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const config = {
+                url: `/rest/api/3/app/field/${parameters.fieldIdOrKey}/context/configuration`,
+                method: 'PUT',
+                data: {
+                    configurations: parameters.configurations,
+                },
+            };
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldConfigurationApps.updateCustomFieldConfiguration',
+            });
+        });
+    }
+}
+exports.IssueCustomFieldConfigurationApps = IssueCustomFieldConfigurationApps;
+//# sourceMappingURL=issueCustomFieldConfigurationApps.js.map
+
+/***/ }),
+
 /***/ 55423:
 /***/ (function(__unused_webpack_module, exports) {
 
@@ -35264,7 +36261,9 @@ class IssueCustomFieldContexts {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldContexts.getContextsForField' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldContexts.getContextsForField',
+            });
         });
     }
     createCustomFieldContext(parameters, callback) {
@@ -35280,7 +36279,9 @@ class IssueCustomFieldContexts {
                     issueTypeIds: parameters.issueTypeIds,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldContexts.createCustomFieldContext' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldContexts.createCustomFieldContext',
+            });
         });
     }
     getDefaultValues(parameters, callback) {
@@ -35294,7 +36295,9 @@ class IssueCustomFieldContexts {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldContexts.getDefaultValues' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldContexts.getDefaultValues',
+            });
         });
     }
     setDefaultValues(parameters, callback) {
@@ -35306,7 +36309,9 @@ class IssueCustomFieldContexts {
                     defaultValues: parameters.defaultValues,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldContexts.setDefaultValues' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldContexts.setDefaultValues',
+            });
         });
     }
     getIssueTypeMappingsForContexts(parameters, callback) {
@@ -35320,7 +36325,9 @@ class IssueCustomFieldContexts {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldContexts.getIssueTypeMappingsForContexts' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldContexts.getIssueTypeMappingsForContexts',
+            });
         });
     }
     getCustomFieldContextsForProjectsAndIssueTypes(parameters, callback) {
@@ -35336,7 +36343,9 @@ class IssueCustomFieldContexts {
                     mappings: parameters.mappings,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldContexts.getCustomFieldContextsForProjectsAndIssueTypes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldContexts.getCustomFieldContextsForProjectsAndIssueTypes',
+            });
         });
     }
     getProjectContextMapping(parameters, callback) {
@@ -35350,7 +36359,9 @@ class IssueCustomFieldContexts {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldContexts.getProjectContextMapping' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldContexts.getProjectContextMapping',
+            });
         });
     }
     updateCustomFieldContext(parameters, callback) {
@@ -35363,7 +36374,9 @@ class IssueCustomFieldContexts {
                     description: parameters.description,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldContexts.updateCustomFieldContext' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldContexts.updateCustomFieldContext',
+            });
         });
     }
     deleteCustomFieldContext(parameters, callback) {
@@ -35372,7 +36385,9 @@ class IssueCustomFieldContexts {
                 url: `/rest/api/3/field/${parameters.fieldId}/context/${parameters.contextId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldContexts.deleteCustomFieldContext' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldContexts.deleteCustomFieldContext',
+            });
         });
     }
     addIssueTypesToContext(parameters, callback) {
@@ -35384,7 +36399,9 @@ class IssueCustomFieldContexts {
                     issueTypeIds: parameters.issueTypeIds,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldContexts.addIssueTypesToContext' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldContexts.addIssueTypesToContext',
+            });
         });
     }
     removeIssueTypesFromContext(parameters, callback) {
@@ -35396,7 +36413,9 @@ class IssueCustomFieldContexts {
                     issueTypeIds: parameters.issueTypeIds,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldContexts.removeIssueTypesFromContext' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldContexts.removeIssueTypesFromContext',
+            });
         });
     }
     assignProjectsToCustomFieldContext(parameters, callback) {
@@ -35408,7 +36427,9 @@ class IssueCustomFieldContexts {
                     projectIds: parameters.projectIds,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldContexts.assignProjectsToCustomFieldContext' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldContexts.assignProjectsToCustomFieldContext',
+            });
         });
     }
     removeCustomFieldContextFromProjects(parameters, callback) {
@@ -35420,7 +36441,9 @@ class IssueCustomFieldContexts {
                     projectIds: parameters.projectIds,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldContexts.removeCustomFieldContextFromProjects' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldContexts.removeCustomFieldContextFromProjects',
+            });
         });
     }
 }
@@ -35459,7 +36482,9 @@ class IssueCustomFieldOptions {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptions.getOptionsForField' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptions.getOptionsForField',
+            });
         });
     }
     createCustomFieldOptions(parameters, callback) {
@@ -35471,7 +36496,9 @@ class IssueCustomFieldOptions {
                     options: parameters.options,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptions.createCustomFieldOptions' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptions.createCustomFieldOptions',
+            });
         });
     }
     updateCustomFieldOptions(parameters, callback) {
@@ -35483,7 +36510,9 @@ class IssueCustomFieldOptions {
                     options: parameters.options,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptions.updateCustomFieldOptions' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptions.updateCustomFieldOptions',
+            });
         });
     }
     getCustomFieldOption(parameters, callback) {
@@ -35492,7 +36521,9 @@ class IssueCustomFieldOptions {
                 url: `/rest/api/3/customFieldOption/${parameters.id}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptions.getCustomFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptions.getCustomFieldOption',
+            });
         });
     }
     getOptionsForContext(parameters, callback) {
@@ -35507,7 +36538,9 @@ class IssueCustomFieldOptions {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptions.getOptionsForContext' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptions.getOptionsForContext',
+            });
         });
     }
     createCustomFieldOption(parameters, callback) {
@@ -35519,7 +36552,9 @@ class IssueCustomFieldOptions {
                     options: parameters.options,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptions.createCustomFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptions.createCustomFieldOption',
+            });
         });
     }
     updateCustomFieldOption(parameters, callback) {
@@ -35531,7 +36566,9 @@ class IssueCustomFieldOptions {
                     options: parameters.options,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptions.updateCustomFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptions.updateCustomFieldOption',
+            });
         });
     }
     reorderCustomFieldOptions(parameters, callback) {
@@ -35545,7 +36582,9 @@ class IssueCustomFieldOptions {
                     position: parameters.position,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptions.reorderCustomFieldOptions' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptions.reorderCustomFieldOptions',
+            });
         });
     }
     deleteCustomFieldOption(parameters, callback) {
@@ -35554,7 +36593,9 @@ class IssueCustomFieldOptions {
                 url: `/rest/api/3/field/${parameters.fieldId}/context/${parameters.contextId}/option/${parameters.optionId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptions.deleteCustomFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptions.deleteCustomFieldOption',
+            });
         });
     }
 }
@@ -35593,7 +36634,9 @@ class IssueCustomFieldOptionsApps {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptionsapps.getAllIssueFieldOptions' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptionsapps.getAllIssueFieldOptions',
+            });
         });
     }
     createIssueFieldOption(parameters, callback) {
@@ -35607,7 +36650,9 @@ class IssueCustomFieldOptionsApps {
                     config: parameters.config,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptionsapps.createIssueFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptionsapps.createIssueFieldOption',
+            });
         });
     }
     getSelectableIssueFieldOptions(parameters, callback) {
@@ -35621,7 +36666,9 @@ class IssueCustomFieldOptionsApps {
                     projectId: parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptionsapps.getSelectableIssueFieldOptions' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptionsapps.getSelectableIssueFieldOptions',
+            });
         });
     }
     getVisibleIssueFieldOptions(parameters, callback) {
@@ -35635,7 +36682,9 @@ class IssueCustomFieldOptionsApps {
                     projectId: parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptionsapps.getVisibleIssueFieldOptions' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptionsapps.getVisibleIssueFieldOptions',
+            });
         });
     }
     getIssueFieldOption(parameters, callback) {
@@ -35644,7 +36693,9 @@ class IssueCustomFieldOptionsApps {
                 url: `/rest/api/3/field/${parameters.fieldKey}/option/${parameters.optionId}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptionsapps.getIssueFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptionsapps.getIssueFieldOption',
+            });
         });
     }
     updateIssueFieldOption(parameters, callback) {
@@ -35659,7 +36710,9 @@ class IssueCustomFieldOptionsApps {
                     config: parameters.config,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptionsapps.updateIssueFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptionsapps.updateIssueFieldOption',
+            });
         });
     }
     deleteIssueFieldOption(parameters, callback) {
@@ -35668,7 +36721,9 @@ class IssueCustomFieldOptionsApps {
                 url: `/rest/api/3/field/${parameters.fieldKey}/option/${parameters.optionId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptionsapps.deleteIssueFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptionsapps.deleteIssueFieldOption',
+            });
         });
     }
     replaceIssueFieldOption(parameters, callback) {
@@ -35681,7 +36736,9 @@ class IssueCustomFieldOptionsApps {
                     jql: parameters.jql,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldOptionsapps.replaceIssueFieldOption' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldOptionsapps.replaceIssueFieldOption',
+            });
         });
     }
 }
@@ -35719,7 +36776,9 @@ class IssueCustomFieldValuesApps {
                     updates: parameters.updates,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueCustomFieldValuesapps.updateCustomFieldValue' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueCustomFieldValuesapps.updateCustomFieldValue',
+            });
         });
     }
 }
@@ -35761,7 +36820,9 @@ class IssueFieldConfigurations {
                     query: parameters === null || parameters === void 0 ? void 0 : parameters.query,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueFieldConfigurations.getAllFieldConfigurations' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueFieldConfigurations.getAllFieldConfigurations',
+            });
         });
     }
     getFieldConfigurationItems(parameters, callback) {
@@ -35774,7 +36835,9 @@ class IssueFieldConfigurations {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueFieldConfigurations.getFieldConfigurationItems' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueFieldConfigurations.getFieldConfigurationItems',
+            });
         });
     }
     getAllFieldConfigurationSchemes(parameters, callback) {
@@ -35788,7 +36851,9 @@ class IssueFieldConfigurations {
                     id: parameters === null || parameters === void 0 ? void 0 : parameters.id,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueFieldConfigurations.getAllFieldConfigurationSchemes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueFieldConfigurations.getAllFieldConfigurationSchemes',
+            });
         });
     }
     getFieldConfigurationSchemeMappings(parameters, callback) {
@@ -35802,7 +36867,9 @@ class IssueFieldConfigurations {
                     fieldConfigurationSchemeId: parameters === null || parameters === void 0 ? void 0 : parameters.fieldConfigurationSchemeId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueFieldConfigurations.getFieldConfigurationSchemeMappings' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueFieldConfigurations.getFieldConfigurationSchemeMappings',
+            });
         });
     }
     getFieldConfigurationSchemeProjectMapping(parameters, callback) {
@@ -35816,7 +36883,9 @@ class IssueFieldConfigurations {
                     projectId: parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueFieldConfigurations.getFieldConfigurationSchemeProjectMapping' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueFieldConfigurations.getFieldConfigurationSchemeProjectMapping',
+            });
         });
     }
     assignFieldConfigurationSchemeToProject(parameters, callback) {
@@ -35829,7 +36898,9 @@ class IssueFieldConfigurations {
                     projectId: parameters === null || parameters === void 0 ? void 0 : parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueFieldConfigurations.assignFieldConfigurationSchemeToProject' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueFieldConfigurations.assignFieldConfigurationSchemeToProject',
+            });
         });
     }
 }
@@ -35924,7 +36995,9 @@ class IssueFields {
                     maxResults: parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueFields.getContextsForFieldDeprecated' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueFields.getContextsForFieldDeprecated',
+            });
         });
     }
 }
@@ -36103,7 +37176,9 @@ class IssueNavigatorSettings {
                 url: '/rest/api/3/settings/columns',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueNavigatorSettings.getIssueNavigatorDefaultColumns' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueNavigatorSettings.getIssueNavigatorDefaultColumns',
+            });
         });
     }
     setIssueNavigatorDefaultColumns(callback) {
@@ -36112,7 +37187,9 @@ class IssueNavigatorSettings {
                 url: '/rest/api/3/settings/columns',
                 method: 'PUT',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueNavigatorSettings.setIssueNavigatorDefaultColumns' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueNavigatorSettings.setIssueNavigatorDefaultColumns',
+            });
         });
     }
 }
@@ -36152,7 +37229,9 @@ class IssueNotificationSchemes {
                     expand: parameters === null || parameters === void 0 ? void 0 : parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueNotificationSchemes.getNotificationSchemes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueNotificationSchemes.getNotificationSchemes',
+            });
         });
     }
     getNotificationScheme(parameters, callback) {
@@ -36164,7 +37243,9 @@ class IssueNotificationSchemes {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueNotificationSchemes.getNotificationScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueNotificationSchemes.getNotificationScheme',
+            });
         });
     }
 }
@@ -36247,7 +37328,9 @@ class IssueProperties {
                     properties: parameters === null || parameters === void 0 ? void 0 : parameters.properties,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueProperties.bulkSetIssuesProperties' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueProperties.bulkSetIssuesProperties',
+            });
         });
     }
     bulkSetIssueProperty(parameters, callback) {
@@ -36274,7 +37357,9 @@ class IssueProperties {
                     currentValue: parameters.currentValue,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueProperties.bulkDeleteIssueProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueProperties.bulkDeleteIssueProperty',
+            });
         });
     }
     getIssuePropertyKeys(parameters, callback) {
@@ -36363,7 +37448,9 @@ class IssueRemoteLinks {
                     object: parameters.object,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueRemoteLinks.createOrUpdateRemoteIssueLink' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueRemoteLinks.createOrUpdateRemoteIssueLink',
+            });
         });
     }
     deleteRemoteIssueLinkByGlobalId(parameters, callback) {
@@ -36375,7 +37462,9 @@ class IssueRemoteLinks {
                     globalId: parameters.globalId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueRemoteLinks.deleteRemoteIssueLinkByGlobalId' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueRemoteLinks.deleteRemoteIssueLinkByGlobalId',
+            });
         });
     }
     getRemoteIssueLinkById(parameters, callback) {
@@ -36384,7 +37473,9 @@ class IssueRemoteLinks {
                 url: `/rest/api/3/issue/${parameters.issueIdOrKey}/remotelink/${parameters.linkId}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueRemoteLinks.getRemoteIssueLinkById' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueRemoteLinks.getRemoteIssueLinkById',
+            });
         });
     }
     updateRemoteIssueLink(parameters, callback) {
@@ -36408,7 +37499,9 @@ class IssueRemoteLinks {
                 url: `/rest/api/3/issue/${parameters.issueIdOrKey}/remotelink/${parameters.linkId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueRemoteLinks.deleteRemoteIssueLinkById' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueRemoteLinks.deleteRemoteIssueLinkById',
+            });
         });
     }
 }
@@ -36546,7 +37639,9 @@ class IssueSearch {
                     fieldsByKeys: parameters === null || parameters === void 0 ? void 0 : parameters.fieldsByKeys,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueSearch.searchForIssuesUsingJqlPost' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueSearch.searchForIssuesUsingJqlPost',
+            });
         });
     }
 }
@@ -36587,7 +37682,9 @@ class IssueSecurityLevel {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueSecurityLevel.getIssueSecurityLevelMembers' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueSecurityLevel.getIssueSecurityLevelMembers',
+            });
         });
     }
     getIssueSecurityLevel(parameters, callback) {
@@ -36596,7 +37693,9 @@ class IssueSecurityLevel {
                 url: `/rest/api/3/securitylevel/${parameters.id}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueSecurityLevel.getIssueSecurityLevel' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueSecurityLevel.getIssueSecurityLevel',
+            });
         });
     }
 }
@@ -36631,7 +37730,9 @@ class IssueSecuritySchemes {
                 url: '/rest/api/3/issuesecurityschemes',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueSecuritySchemes.getIssueSecuritySchemes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueSecuritySchemes.getIssueSecuritySchemes',
+            });
         });
     }
     getIssueSecurityScheme(parameters, callback) {
@@ -36640,7 +37741,9 @@ class IssueSecuritySchemes {
                 url: `/rest/api/3/issuesecurityschemes/${parameters.id}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueSecuritySchemes.getIssueSecurityScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueSecuritySchemes.getIssueSecurityScheme',
+            });
         });
     }
 }
@@ -36675,7 +37778,9 @@ class IssueTypeProperties {
                 url: `/rest/api/3/issuetype/${parameters.issueTypeId}/properties`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeProperties.getIssueTypePropertyKeys' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeProperties.getIssueTypePropertyKeys',
+            });
         });
     }
     getIssueTypeProperty(parameters, callback) {
@@ -36684,7 +37789,9 @@ class IssueTypeProperties {
                 url: `/rest/api/3/issuetype/${parameters.issueTypeId}/properties/${parameters.propertyKey}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeProperties.getIssueTypeProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeProperties.getIssueTypeProperty',
+            });
         });
     }
     setIssueTypeProperty(parameters, callback) {
@@ -36693,7 +37800,9 @@ class IssueTypeProperties {
                 url: `/rest/api/3/issuetype/${parameters.issueTypeId}/properties/${parameters.propertyKey}`,
                 method: 'PUT',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeProperties.setIssueTypeProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeProperties.setIssueTypeProperty',
+            });
         });
     }
     deleteIssueTypeProperty(parameters, callback) {
@@ -36702,7 +37811,9 @@ class IssueTypeProperties {
                 url: `/rest/api/3/issuetype/${parameters.issueTypeId}/properties/${parameters.propertyKey}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeProperties.deleteIssueTypeProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeProperties.deleteIssueTypeProperty',
+            });
         });
     }
 }
@@ -36742,7 +37853,9 @@ class IssueTypeSchemes {
                     id: parameters === null || parameters === void 0 ? void 0 : parameters.id,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeSchemes.getAllIssueTypeSchemes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeSchemes.getAllIssueTypeSchemes',
+            });
         });
     }
     createIssueTypeScheme(parameters, callback) {
@@ -36771,7 +37884,9 @@ class IssueTypeSchemes {
                     issueTypeSchemeId: parameters === null || parameters === void 0 ? void 0 : parameters.issueTypeSchemeId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeSchemes.getIssueTypeSchemesMapping' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeSchemes.getIssueTypeSchemesMapping',
+            });
         });
     }
     getIssueTypeSchemeForProjects(parameters, callback) {
@@ -36785,7 +37900,9 @@ class IssueTypeSchemes {
                     projectId: parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeSchemes.getIssueTypeSchemeForProjects' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeSchemes.getIssueTypeSchemeForProjects',
+            });
         });
     }
     assignIssueTypeSchemeToProject(parameters, callback) {
@@ -36798,7 +37915,9 @@ class IssueTypeSchemes {
                     projectId: parameters === null || parameters === void 0 ? void 0 : parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeSchemes.assignIssueTypeSchemeToProject' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeSchemes.assignIssueTypeSchemeToProject',
+            });
         });
     }
     updateIssueTypeScheme(parameters, callback) {
@@ -36833,7 +37952,9 @@ class IssueTypeSchemes {
                     issueTypeIds: parameters.issueTypeIds,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeSchemes.addIssueTypesToIssueTypeScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeSchemes.addIssueTypesToIssueTypeScheme',
+            });
         });
     }
     reorderIssueTypesInIssueTypeScheme(parameters, callback) {
@@ -36847,7 +37968,9 @@ class IssueTypeSchemes {
                     position: parameters.position,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeSchemes.reorderIssueTypesInIssueTypeScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeSchemes.reorderIssueTypesInIssueTypeScheme',
+            });
         });
     }
     removeIssueTypeFromIssueTypeScheme(parameters, callback) {
@@ -36856,7 +37979,9 @@ class IssueTypeSchemes {
                 url: `/rest/api/3/issuetypescheme/${parameters.issueTypeSchemeId}/issuetype/${parameters.issueTypeId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeSchemes.removeIssueTypeFromIssueTypeScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeSchemes.removeIssueTypeFromIssueTypeScheme',
+            });
         });
     }
 }
@@ -36896,7 +38021,9 @@ class IssueTypeScreenSchemes {
                     id: parameters === null || parameters === void 0 ? void 0 : parameters.id,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeScreenSchemes.getIssueTypeScreenSchemes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeScreenSchemes.getIssueTypeScreenSchemes',
+            });
         });
     }
     createIssueTypeScreenScheme(parameters, callback) {
@@ -36910,7 +38037,9 @@ class IssueTypeScreenSchemes {
                     issueTypeMappings: parameters === null || parameters === void 0 ? void 0 : parameters.issueTypeMappings,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeScreenSchemes.createIssueTypeScreenScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeScreenSchemes.createIssueTypeScreenScheme',
+            });
         });
     }
     getIssueTypeScreenSchemeMappings(parameters, callback) {
@@ -36924,7 +38053,9 @@ class IssueTypeScreenSchemes {
                     issueTypeScreenSchemeId: parameters === null || parameters === void 0 ? void 0 : parameters.issueTypeScreenSchemeId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeScreenSchemes.getIssueTypeScreenSchemeMappings' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeScreenSchemes.getIssueTypeScreenSchemeMappings',
+            });
         });
     }
     getIssueTypeScreenSchemeProjectAssociations(parameters, callback) {
@@ -36938,7 +38069,9 @@ class IssueTypeScreenSchemes {
                     projectId: parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeScreenSchemes.getIssueTypeScreenSchemeProjectAssociations' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeScreenSchemes.getIssueTypeScreenSchemeProjectAssociations',
+            });
         });
     }
     assignIssueTypeScreenSchemeToProject(parameters, callback) {
@@ -36951,7 +38084,9 @@ class IssueTypeScreenSchemes {
                     projectId: parameters === null || parameters === void 0 ? void 0 : parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeScreenSchemes.assignIssueTypeScreenSchemeToProject' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeScreenSchemes.assignIssueTypeScreenSchemeToProject',
+            });
         });
     }
     updateIssueTypeScreenScheme(parameters, callback) {
@@ -36964,7 +38099,9 @@ class IssueTypeScreenSchemes {
                     description: parameters.description,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeScreenSchemes.updateIssueTypeScreenScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeScreenSchemes.updateIssueTypeScreenScheme',
+            });
         });
     }
     deleteIssueTypeScreenScheme(parameters, callback) {
@@ -36973,7 +38110,9 @@ class IssueTypeScreenSchemes {
                 url: `/rest/api/3/issuetypescreenscheme/${parameters.issueTypeScreenSchemeId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeScreenSchemes.deleteIssueTypeScreenScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeScreenSchemes.deleteIssueTypeScreenScheme',
+            });
         });
     }
     appendMappingsForIssueTypeScreenScheme(parameters, callback) {
@@ -36985,7 +38124,9 @@ class IssueTypeScreenSchemes {
                     issueTypeMappings: parameters.issueTypeMappings,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeScreenSchemes.appendMappingsForIssueTypeScreenScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeScreenSchemes.appendMappingsForIssueTypeScreenScheme',
+            });
         });
     }
     updateDefaultScreenScheme(parameters, callback) {
@@ -36997,7 +38138,9 @@ class IssueTypeScreenSchemes {
                     screenSchemeId: parameters.screenSchemeId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeScreenSchemes.updateDefaultScreenScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeScreenSchemes.updateDefaultScreenScheme',
+            });
         });
     }
     removeMappingsFromIssueTypeScreenScheme(parameters, callback) {
@@ -37009,7 +38152,9 @@ class IssueTypeScreenSchemes {
                     issueTypeIds: parameters.issueTypeIds,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypeScreenSchemes.removeMappingsFromIssueTypeScreenScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueTypeScreenSchemes.removeMappingsFromIssueTypeScreenScheme',
+            });
         });
     }
 }
@@ -37059,6 +38204,19 @@ class IssueTypes {
                 },
             };
             return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypes.createIssueType' });
+        });
+    }
+    getIssueTypesForProject(parameters, callback) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const config = {
+                url: '/rest/api/3/issuetype/project',
+                method: 'GET',
+                params: {
+                    projectId: parameters.projectId,
+                    level: parameters.level,
+                },
+            };
+            return this.client.sendRequest(config, callback, { methodName: 'version3.issueTypes.getIssueTypesForProject' });
         });
     }
     getIssueType(parameters, callback) {
@@ -37261,7 +38419,9 @@ class IssueWorklogProperties {
                 url: `/rest/api/3/issue/${parameters.issueIdOrKey}/worklog/${parameters.worklogId}/properties`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueWorklogProperties.getWorklogPropertyKeys' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueWorklogProperties.getWorklogPropertyKeys',
+            });
         });
     }
     getWorklogProperty(parameters, callback) {
@@ -37270,7 +38430,9 @@ class IssueWorklogProperties {
                 url: `/rest/api/3/issue/${parameters.issueIdOrKey}/worklog/${parameters.worklogId}/properties/${parameters.propertyKey}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueWorklogProperties.getWorklogProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueWorklogProperties.getWorklogProperty',
+            });
         });
     }
     setWorklogProperty(parameters, callback) {
@@ -37279,7 +38441,9 @@ class IssueWorklogProperties {
                 url: `/rest/api/3/issue/${parameters.issueIdOrKey}/worklog/${parameters.worklogId}/properties/${parameters.propertyKey}`,
                 method: 'PUT',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueWorklogProperties.setWorklogProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueWorklogProperties.setWorklogProperty',
+            });
         });
     }
     deleteWorklogProperty(parameters, callback) {
@@ -37288,7 +38452,9 @@ class IssueWorklogProperties {
                 url: `/rest/api/3/issue/${parameters.issueIdOrKey}/worklog/${parameters.worklogId}/properties/${parameters.propertyKey}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueWorklogProperties.deleteWorklogProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueWorklogProperties.deleteWorklogProperty',
+            });
         });
     }
 }
@@ -37425,7 +38591,9 @@ class IssueWorklogs {
                     since: parameters === null || parameters === void 0 ? void 0 : parameters.since,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueWorklogs.getIdsOfWorklogsDeletedSince' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueWorklogs.getIdsOfWorklogsDeletedSince',
+            });
         });
     }
     getWorklogsForIds(parameters, callback) {
@@ -37453,7 +38621,9 @@ class IssueWorklogs {
                     expand: parameters === null || parameters === void 0 ? void 0 : parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.issueWorklogs.getIdsOfWorklogsModifiedSince' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.issueWorklogs.getIdsOfWorklogsModifiedSince',
+            });
         });
     }
 }
@@ -38458,6 +39628,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 /***/ }),
 
+/***/ 18988:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=contextualConfiguration.js.map
+
+/***/ }),
+
 /***/ 15428:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -38485,6 +39665,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 //# sourceMappingURL=createCustomFieldContext.js.map
+
+/***/ }),
+
+/***/ 71476:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=createProjectDetails.js.map
 
 /***/ }),
 
@@ -38535,6 +39725,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 //# sourceMappingURL=createdIssues.js.map
+
+/***/ }),
+
+/***/ 37921:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=customFieldConfigurations.js.map
 
 /***/ }),
 
@@ -39284,12 +40484,6 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-__exportStar(__nccwpck_require__(72376), exports);
-__exportStar(__nccwpck_require__(36162), exports);
-__exportStar(__nccwpck_require__(82206), exports);
-__exportStar(__nccwpck_require__(47620), exports);
-__exportStar(__nccwpck_require__(26214), exports);
-__exportStar(__nccwpck_require__(24815), exports);
 __exportStar(__nccwpck_require__(11622), exports);
 __exportStar(__nccwpck_require__(12757), exports);
 __exportStar(__nccwpck_require__(35089), exports);
@@ -39311,8 +40505,8 @@ __exportStar(__nccwpck_require__(68126), exports);
 __exportStar(__nccwpck_require__(67769), exports);
 __exportStar(__nccwpck_require__(30853), exports);
 __exportStar(__nccwpck_require__(79810), exports);
-__exportStar(__nccwpck_require__(67797), exports);
 __exportStar(__nccwpck_require__(38403), exports);
+__exportStar(__nccwpck_require__(67797), exports);
 __exportStar(__nccwpck_require__(63269), exports);
 __exportStar(__nccwpck_require__(26468), exports);
 __exportStar(__nccwpck_require__(3237), exports);
@@ -39342,14 +40536,17 @@ __exportStar(__nccwpck_require__(41001), exports);
 __exportStar(__nccwpck_require__(76574), exports);
 __exportStar(__nccwpck_require__(45494), exports);
 __exportStar(__nccwpck_require__(52835), exports);
+__exportStar(__nccwpck_require__(18988), exports);
 __exportStar(__nccwpck_require__(15428), exports);
 __exportStar(__nccwpck_require__(98998), exports);
 __exportStar(__nccwpck_require__(89618), exports);
+__exportStar(__nccwpck_require__(9155), exports);
+__exportStar(__nccwpck_require__(31232), exports);
+__exportStar(__nccwpck_require__(71476), exports);
 __exportStar(__nccwpck_require__(89567), exports);
 __exportStar(__nccwpck_require__(37346), exports);
 __exportStar(__nccwpck_require__(53940), exports);
-__exportStar(__nccwpck_require__(9155), exports);
-__exportStar(__nccwpck_require__(31232), exports);
+__exportStar(__nccwpck_require__(37921), exports);
 __exportStar(__nccwpck_require__(70682), exports);
 __exportStar(__nccwpck_require__(91198), exports);
 __exportStar(__nccwpck_require__(57086), exports);
@@ -39368,6 +40565,8 @@ __exportStar(__nccwpck_require__(65589), exports);
 __exportStar(__nccwpck_require__(91690), exports);
 __exportStar(__nccwpck_require__(82433), exports);
 __exportStar(__nccwpck_require__(96153), exports);
+__exportStar(__nccwpck_require__(72376), exports);
+__exportStar(__nccwpck_require__(36162), exports);
 __exportStar(__nccwpck_require__(82297), exports);
 __exportStar(__nccwpck_require__(94092), exports);
 __exportStar(__nccwpck_require__(67322), exports);
@@ -39392,10 +40591,10 @@ __exportStar(__nccwpck_require__(75815), exports);
 __exportStar(__nccwpck_require__(11261), exports);
 __exportStar(__nccwpck_require__(69562), exports);
 __exportStar(__nccwpck_require__(25644), exports);
+__exportStar(__nccwpck_require__(9615), exports);
 __exportStar(__nccwpck_require__(88415), exports);
 __exportStar(__nccwpck_require__(94101), exports);
 __exportStar(__nccwpck_require__(64162), exports);
-__exportStar(__nccwpck_require__(9615), exports);
 __exportStar(__nccwpck_require__(64497), exports);
 __exportStar(__nccwpck_require__(81055), exports);
 __exportStar(__nccwpck_require__(41343), exports);
@@ -39438,7 +40637,11 @@ __exportStar(__nccwpck_require__(54449), exports);
 __exportStar(__nccwpck_require__(77813), exports);
 __exportStar(__nccwpck_require__(50502), exports);
 __exportStar(__nccwpck_require__(20332), exports);
+__exportStar(__nccwpck_require__(62896), exports);
 __exportStar(__nccwpck_require__(86373), exports);
+__exportStar(__nccwpck_require__(91284), exports);
+__exportStar(__nccwpck_require__(77869), exports);
+__exportStar(__nccwpck_require__(99266), exports);
 __exportStar(__nccwpck_require__(27864), exports);
 __exportStar(__nccwpck_require__(23951), exports);
 __exportStar(__nccwpck_require__(95512), exports);
@@ -39459,22 +40662,15 @@ __exportStar(__nccwpck_require__(67908), exports);
 __exportStar(__nccwpck_require__(24842), exports);
 __exportStar(__nccwpck_require__(51882), exports);
 __exportStar(__nccwpck_require__(35595), exports);
-__exportStar(__nccwpck_require__(76013), exports);
 __exportStar(__nccwpck_require__(33006), exports);
+__exportStar(__nccwpck_require__(76013), exports);
+__exportStar(__nccwpck_require__(36338), exports);
 __exportStar(__nccwpck_require__(14011), exports);
 __exportStar(__nccwpck_require__(25398), exports);
 __exportStar(__nccwpck_require__(9394), exports);
 __exportStar(__nccwpck_require__(98671), exports);
-__exportStar(__nccwpck_require__(36338), exports);
 __exportStar(__nccwpck_require__(57108), exports);
 __exportStar(__nccwpck_require__(84980), exports);
-__exportStar(__nccwpck_require__(62896), exports);
-__exportStar(__nccwpck_require__(91284), exports);
-__exportStar(__nccwpck_require__(77869), exports);
-__exportStar(__nccwpck_require__(99266), exports);
-__exportStar(__nccwpck_require__(31485), exports);
-__exportStar(__nccwpck_require__(8752), exports);
-__exportStar(__nccwpck_require__(79925), exports);
 __exportStar(__nccwpck_require__(39633), exports);
 __exportStar(__nccwpck_require__(41049), exports);
 __exportStar(__nccwpck_require__(10099), exports);
@@ -39484,10 +40680,11 @@ __exportStar(__nccwpck_require__(56352), exports);
 __exportStar(__nccwpck_require__(90078), exports);
 __exportStar(__nccwpck_require__(88898), exports);
 __exportStar(__nccwpck_require__(20760), exports);
-__exportStar(__nccwpck_require__(40243), exports);
 __exportStar(__nccwpck_require__(72764), exports);
 __exportStar(__nccwpck_require__(45857), exports);
 __exportStar(__nccwpck_require__(53599), exports);
+__exportStar(__nccwpck_require__(40243), exports);
+__exportStar(__nccwpck_require__(31485), exports);
 __exportStar(__nccwpck_require__(95189), exports);
 __exportStar(__nccwpck_require__(43307), exports);
 __exportStar(__nccwpck_require__(72743), exports);
@@ -39498,12 +40695,16 @@ __exportStar(__nccwpck_require__(5472), exports);
 __exportStar(__nccwpck_require__(94658), exports);
 __exportStar(__nccwpck_require__(89726), exports);
 __exportStar(__nccwpck_require__(18402), exports);
+__exportStar(__nccwpck_require__(8752), exports);
+__exportStar(__nccwpck_require__(79925), exports);
 __exportStar(__nccwpck_require__(63223), exports);
 __exportStar(__nccwpck_require__(50526), exports);
 __exportStar(__nccwpck_require__(51414), exports);
+__exportStar(__nccwpck_require__(82206), exports);
+__exportStar(__nccwpck_require__(47620), exports);
+__exportStar(__nccwpck_require__(39022), exports);
 __exportStar(__nccwpck_require__(41806), exports);
 __exportStar(__nccwpck_require__(62077), exports);
-__exportStar(__nccwpck_require__(39022), exports);
 __exportStar(__nccwpck_require__(68953), exports);
 __exportStar(__nccwpck_require__(87545), exports);
 __exportStar(__nccwpck_require__(7479), exports);
@@ -39562,20 +40763,21 @@ __exportStar(__nccwpck_require__(60804), exports);
 __exportStar(__nccwpck_require__(99785), exports);
 __exportStar(__nccwpck_require__(70901), exports);
 __exportStar(__nccwpck_require__(41819), exports);
+__exportStar(__nccwpck_require__(61031), exports);
+__exportStar(__nccwpck_require__(49942), exports);
 __exportStar(__nccwpck_require__(23151), exports);
 __exportStar(__nccwpck_require__(17838), exports);
 __exportStar(__nccwpck_require__(85458), exports);
 __exportStar(__nccwpck_require__(64080), exports);
-__exportStar(__nccwpck_require__(49942), exports);
 __exportStar(__nccwpck_require__(92995), exports);
 __exportStar(__nccwpck_require__(26567), exports);
 __exportStar(__nccwpck_require__(81572), exports);
 __exportStar(__nccwpck_require__(67310), exports);
 __exportStar(__nccwpck_require__(12053), exports);
 __exportStar(__nccwpck_require__(56117), exports);
+__exportStar(__nccwpck_require__(80985), exports);
 __exportStar(__nccwpck_require__(5090), exports);
 __exportStar(__nccwpck_require__(55667), exports);
-__exportStar(__nccwpck_require__(80985), exports);
 __exportStar(__nccwpck_require__(55020), exports);
 __exportStar(__nccwpck_require__(78930), exports);
 __exportStar(__nccwpck_require__(46731), exports);
@@ -39584,8 +40786,9 @@ __exportStar(__nccwpck_require__(36413), exports);
 __exportStar(__nccwpck_require__(84504), exports);
 __exportStar(__nccwpck_require__(95748), exports);
 __exportStar(__nccwpck_require__(94987), exports);
-__exportStar(__nccwpck_require__(21670), exports);
 __exportStar(__nccwpck_require__(87368), exports);
+__exportStar(__nccwpck_require__(26214), exports);
+__exportStar(__nccwpck_require__(21670), exports);
 __exportStar(__nccwpck_require__(87434), exports);
 __exportStar(__nccwpck_require__(67779), exports);
 __exportStar(__nccwpck_require__(12950), exports);
@@ -39624,6 +40827,8 @@ __exportStar(__nccwpck_require__(33027), exports);
 __exportStar(__nccwpck_require__(42696), exports);
 __exportStar(__nccwpck_require__(30347), exports);
 __exportStar(__nccwpck_require__(87931), exports);
+__exportStar(__nccwpck_require__(89240), exports);
+__exportStar(__nccwpck_require__(86048), exports);
 __exportStar(__nccwpck_require__(60204), exports);
 __exportStar(__nccwpck_require__(40341), exports);
 __exportStar(__nccwpck_require__(13311), exports);
@@ -39631,9 +40836,8 @@ __exportStar(__nccwpck_require__(94902), exports);
 __exportStar(__nccwpck_require__(83783), exports);
 __exportStar(__nccwpck_require__(28654), exports);
 __exportStar(__nccwpck_require__(16282), exports);
-__exportStar(__nccwpck_require__(89240), exports);
-__exportStar(__nccwpck_require__(86048), exports);
 __exportStar(__nccwpck_require__(75309), exports);
+__exportStar(__nccwpck_require__(24815), exports);
 __exportStar(__nccwpck_require__(7824), exports);
 __exportStar(__nccwpck_require__(33095), exports);
 __exportStar(__nccwpck_require__(79234), exports);
@@ -39650,6 +40854,7 @@ __exportStar(__nccwpck_require__(92881), exports);
 __exportStar(__nccwpck_require__(77494), exports);
 __exportStar(__nccwpck_require__(20216), exports);
 __exportStar(__nccwpck_require__(80360), exports);
+__exportStar(__nccwpck_require__(44520), exports);
 __exportStar(__nccwpck_require__(74799), exports);
 __exportStar(__nccwpck_require__(40373), exports);
 __exportStar(__nccwpck_require__(14649), exports);
@@ -39664,11 +40869,12 @@ __exportStar(__nccwpck_require__(61987), exports);
 __exportStar(__nccwpck_require__(80951), exports);
 __exportStar(__nccwpck_require__(94459), exports);
 __exportStar(__nccwpck_require__(88396), exports);
+__exportStar(__nccwpck_require__(82055), exports);
+__exportStar(__nccwpck_require__(99928), exports);
 __exportStar(__nccwpck_require__(47386), exports);
 __exportStar(__nccwpck_require__(41822), exports);
 __exportStar(__nccwpck_require__(89689), exports);
 __exportStar(__nccwpck_require__(93606), exports);
-__exportStar(__nccwpck_require__(82055), exports);
 __exportStar(__nccwpck_require__(54820), exports);
 __exportStar(__nccwpck_require__(66452), exports);
 __exportStar(__nccwpck_require__(69125), exports);
@@ -39704,12 +40910,12 @@ __exportStar(__nccwpck_require__(95350), exports);
 __exportStar(__nccwpck_require__(5520), exports);
 __exportStar(__nccwpck_require__(88594), exports);
 __exportStar(__nccwpck_require__(39355), exports);
+__exportStar(__nccwpck_require__(19792), exports);
 __exportStar(__nccwpck_require__(47413), exports);
 __exportStar(__nccwpck_require__(8269), exports);
 __exportStar(__nccwpck_require__(76914), exports);
 __exportStar(__nccwpck_require__(16081), exports);
 __exportStar(__nccwpck_require__(53476), exports);
-__exportStar(__nccwpck_require__(19792), exports);
 __exportStar(__nccwpck_require__(52389), exports);
 __exportStar(__nccwpck_require__(24793), exports);
 __exportStar(__nccwpck_require__(56903), exports);
@@ -41149,6 +42355,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 /***/ }),
 
+/***/ 61031:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=pageContextualConfiguration.js.map
+
+/***/ }),
+
 /***/ 23151:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -41325,6 +42541,18 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Project = void 0;
+var Project;
+(function (Project) {
+    let Expand;
+    (function (Expand) {
+        Expand["Description"] = "description";
+        Expand["IssueTypes"] = "issueTypes";
+        Expand["Lead"] = "lead";
+        Expand["ProjectKeys"] = "projectKeys";
+        Expand["IssueTypeHierarchy"] = "issueTypeHierarchy";
+    })(Expand = Project.Expand || (Project.Expand = {}));
+})(Project = exports.Project || (exports.Project = {}));
 //# sourceMappingURL=project.js.map
 
 /***/ }),
@@ -42049,6 +43277,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 /***/ }),
 
+/***/ 44520:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=statusMapping.js.map
+
+/***/ }),
+
 /***/ 74799:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -42186,6 +43424,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 //# sourceMappingURL=updateDefaultScreenScheme.js.map
+
+/***/ }),
+
+/***/ 99928:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=updateProjectDetails.js.map
 
 /***/ }),
 
@@ -43603,7 +44851,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 /***/ }),
 
-/***/ 73009:
+/***/ 68153:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -43683,7 +44931,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 /***/ }),
 
-/***/ 68153:
+/***/ 97579:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -44553,6 +45801,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 /***/ }),
 
+/***/ 50110:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=getCustomFieldConfiguration.js.map
+
+/***/ }),
+
 /***/ 45426:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -45010,6 +46268,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 //# sourceMappingURL=getIssueTypeScreenSchemes.js.map
+
+/***/ }),
+
+/***/ 79864:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=getIssueTypesForProject.js.map
 
 /***/ }),
 
@@ -45769,396 +47037,400 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-__exportStar(__nccwpck_require__(56705), exports);
-__exportStar(__nccwpck_require__(17275), exports);
-__exportStar(__nccwpck_require__(11338), exports);
-__exportStar(__nccwpck_require__(55896), exports);
-__exportStar(__nccwpck_require__(85225), exports);
-__exportStar(__nccwpck_require__(587), exports);
+__exportStar(__nccwpck_require__(17191), exports);
+__exportStar(__nccwpck_require__(22782), exports);
+__exportStar(__nccwpck_require__(52652), exports);
+__exportStar(__nccwpck_require__(53193), exports);
+__exportStar(__nccwpck_require__(94469), exports);
+__exportStar(__nccwpck_require__(20578), exports);
+__exportStar(__nccwpck_require__(21974), exports);
+__exportStar(__nccwpck_require__(41836), exports);
+__exportStar(__nccwpck_require__(808), exports);
+__exportStar(__nccwpck_require__(35245), exports);
+__exportStar(__nccwpck_require__(33858), exports);
+__exportStar(__nccwpck_require__(17694), exports);
+__exportStar(__nccwpck_require__(16430), exports);
+__exportStar(__nccwpck_require__(36383), exports);
+__exportStar(__nccwpck_require__(37881), exports);
+__exportStar(__nccwpck_require__(9234), exports);
+__exportStar(__nccwpck_require__(33156), exports);
+__exportStar(__nccwpck_require__(39740), exports);
+__exportStar(__nccwpck_require__(27794), exports);
+__exportStar(__nccwpck_require__(72112), exports);
+__exportStar(__nccwpck_require__(54099), exports);
+__exportStar(__nccwpck_require__(77926), exports);
+__exportStar(__nccwpck_require__(79990), exports);
+__exportStar(__nccwpck_require__(95869), exports);
+__exportStar(__nccwpck_require__(38484), exports);
+__exportStar(__nccwpck_require__(67751), exports);
+__exportStar(__nccwpck_require__(95134), exports);
+__exportStar(__nccwpck_require__(99683), exports);
+__exportStar(__nccwpck_require__(87084), exports);
+__exportStar(__nccwpck_require__(65909), exports);
+__exportStar(__nccwpck_require__(87611), exports);
+__exportStar(__nccwpck_require__(76034), exports);
+__exportStar(__nccwpck_require__(85820), exports);
+__exportStar(__nccwpck_require__(85898), exports);
+__exportStar(__nccwpck_require__(79592), exports);
+__exportStar(__nccwpck_require__(21676), exports);
+__exportStar(__nccwpck_require__(88127), exports);
+__exportStar(__nccwpck_require__(10610), exports);
+__exportStar(__nccwpck_require__(74800), exports);
+__exportStar(__nccwpck_require__(81473), exports);
+__exportStar(__nccwpck_require__(4362), exports);
+__exportStar(__nccwpck_require__(18230), exports);
+__exportStar(__nccwpck_require__(69452), exports);
+__exportStar(__nccwpck_require__(53915), exports);
+__exportStar(__nccwpck_require__(65318), exports);
+__exportStar(__nccwpck_require__(97859), exports);
+__exportStar(__nccwpck_require__(98354), exports);
+__exportStar(__nccwpck_require__(54324), exports);
+__exportStar(__nccwpck_require__(48951), exports);
+__exportStar(__nccwpck_require__(45057), exports);
+__exportStar(__nccwpck_require__(51291), exports);
+__exportStar(__nccwpck_require__(92391), exports);
+__exportStar(__nccwpck_require__(47854), exports);
+__exportStar(__nccwpck_require__(62583), exports);
+__exportStar(__nccwpck_require__(69357), exports);
+__exportStar(__nccwpck_require__(3087), exports);
+__exportStar(__nccwpck_require__(2678), exports);
+__exportStar(__nccwpck_require__(62376), exports);
+__exportStar(__nccwpck_require__(62916), exports);
+__exportStar(__nccwpck_require__(45985), exports);
+__exportStar(__nccwpck_require__(66844), exports);
+__exportStar(__nccwpck_require__(96217), exports);
+__exportStar(__nccwpck_require__(11300), exports);
+__exportStar(__nccwpck_require__(98440), exports);
+__exportStar(__nccwpck_require__(12074), exports);
+__exportStar(__nccwpck_require__(1678), exports);
+__exportStar(__nccwpck_require__(84080), exports);
+__exportStar(__nccwpck_require__(20653), exports);
+__exportStar(__nccwpck_require__(23044), exports);
+__exportStar(__nccwpck_require__(71075), exports);
+__exportStar(__nccwpck_require__(10496), exports);
+__exportStar(__nccwpck_require__(80395), exports);
+__exportStar(__nccwpck_require__(76970), exports);
+__exportStar(__nccwpck_require__(9748), exports);
+__exportStar(__nccwpck_require__(78084), exports);
+__exportStar(__nccwpck_require__(45639), exports);
+__exportStar(__nccwpck_require__(58247), exports);
+__exportStar(__nccwpck_require__(90700), exports);
+__exportStar(__nccwpck_require__(68912), exports);
+__exportStar(__nccwpck_require__(70733), exports);
+__exportStar(__nccwpck_require__(68153), exports);
+__exportStar(__nccwpck_require__(43491), exports);
+__exportStar(__nccwpck_require__(97528), exports);
+__exportStar(__nccwpck_require__(993), exports);
+__exportStar(__nccwpck_require__(18384), exports);
+__exportStar(__nccwpck_require__(54677), exports);
+__exportStar(__nccwpck_require__(10562), exports);
+__exportStar(__nccwpck_require__(30208), exports);
+__exportStar(__nccwpck_require__(97579), exports);
+__exportStar(__nccwpck_require__(60986), exports);
+__exportStar(__nccwpck_require__(43455), exports);
+__exportStar(__nccwpck_require__(78115), exports);
+__exportStar(__nccwpck_require__(87584), exports);
+__exportStar(__nccwpck_require__(33716), exports);
+__exportStar(__nccwpck_require__(1817), exports);
+__exportStar(__nccwpck_require__(92657), exports);
+__exportStar(__nccwpck_require__(90684), exports);
+__exportStar(__nccwpck_require__(43599), exports);
+__exportStar(__nccwpck_require__(9465), exports);
+__exportStar(__nccwpck_require__(74168), exports);
+__exportStar(__nccwpck_require__(79077), exports);
+__exportStar(__nccwpck_require__(30059), exports);
+__exportStar(__nccwpck_require__(35653), exports);
+__exportStar(__nccwpck_require__(57010), exports);
+__exportStar(__nccwpck_require__(81839), exports);
+__exportStar(__nccwpck_require__(33547), exports);
+__exportStar(__nccwpck_require__(19368), exports);
+__exportStar(__nccwpck_require__(25685), exports);
+__exportStar(__nccwpck_require__(16997), exports);
+__exportStar(__nccwpck_require__(18779), exports);
+__exportStar(__nccwpck_require__(2980), exports);
+__exportStar(__nccwpck_require__(26498), exports);
+__exportStar(__nccwpck_require__(94612), exports);
+__exportStar(__nccwpck_require__(44399), exports);
+__exportStar(__nccwpck_require__(59764), exports);
+__exportStar(__nccwpck_require__(14147), exports);
+__exportStar(__nccwpck_require__(87001), exports);
+__exportStar(__nccwpck_require__(11943), exports);
+__exportStar(__nccwpck_require__(72890), exports);
 __exportStar(__nccwpck_require__(81159), exports);
 __exportStar(__nccwpck_require__(54513), exports);
-__exportStar(__nccwpck_require__(22782), exports);
-__exportStar(__nccwpck_require__(64160), exports);
-__exportStar(__nccwpck_require__(29730), exports);
-__exportStar(__nccwpck_require__(43829), exports);
-__exportStar(__nccwpck_require__(57854), exports);
-__exportStar(__nccwpck_require__(20653), exports);
-__exportStar(__nccwpck_require__(46744), exports);
-__exportStar(__nccwpck_require__(53610), exports);
-__exportStar(__nccwpck_require__(52652), exports);
-__exportStar(__nccwpck_require__(70925), exports);
-__exportStar(__nccwpck_require__(42704), exports);
-__exportStar(__nccwpck_require__(23044), exports);
-__exportStar(__nccwpck_require__(89883), exports);
-__exportStar(__nccwpck_require__(87091), exports);
-__exportStar(__nccwpck_require__(39670), exports);
-__exportStar(__nccwpck_require__(71075), exports);
-__exportStar(__nccwpck_require__(85898), exports);
-__exportStar(__nccwpck_require__(22421), exports);
-__exportStar(__nccwpck_require__(34985), exports);
-__exportStar(__nccwpck_require__(10496), exports);
-__exportStar(__nccwpck_require__(87871), exports);
-__exportStar(__nccwpck_require__(55557), exports);
-__exportStar(__nccwpck_require__(80230), exports);
-__exportStar(__nccwpck_require__(92780), exports);
-__exportStar(__nccwpck_require__(47033), exports);
-__exportStar(__nccwpck_require__(30433), exports);
-__exportStar(__nccwpck_require__(10610), exports);
-__exportStar(__nccwpck_require__(50857), exports);
-__exportStar(__nccwpck_require__(19629), exports);
-__exportStar(__nccwpck_require__(42943), exports);
-__exportStar(__nccwpck_require__(88127), exports);
-__exportStar(__nccwpck_require__(25305), exports);
-__exportStar(__nccwpck_require__(24323), exports);
-__exportStar(__nccwpck_require__(76970), exports);
+__exportStar(__nccwpck_require__(4833), exports);
+__exportStar(__nccwpck_require__(94537), exports);
+__exportStar(__nccwpck_require__(96942), exports);
+__exportStar(__nccwpck_require__(18965), exports);
+__exportStar(__nccwpck_require__(97346), exports);
+__exportStar(__nccwpck_require__(55171), exports);
+__exportStar(__nccwpck_require__(28826), exports);
+__exportStar(__nccwpck_require__(27409), exports);
+__exportStar(__nccwpck_require__(73420), exports);
+__exportStar(__nccwpck_require__(16435), exports);
+__exportStar(__nccwpck_require__(42831), exports);
+__exportStar(__nccwpck_require__(72944), exports);
+__exportStar(__nccwpck_require__(32800), exports);
+__exportStar(__nccwpck_require__(29129), exports);
 __exportStar(__nccwpck_require__(97612), exports);
-__exportStar(__nccwpck_require__(74800), exports);
-__exportStar(__nccwpck_require__(64169), exports);
-__exportStar(__nccwpck_require__(19048), exports);
-__exportStar(__nccwpck_require__(93580), exports);
-__exportStar(__nccwpck_require__(60258), exports);
-__exportStar(__nccwpck_require__(78084), exports);
-__exportStar(__nccwpck_require__(15780), exports);
-__exportStar(__nccwpck_require__(9841), exports);
-__exportStar(__nccwpck_require__(9748), exports);
-__exportStar(__nccwpck_require__(85820), exports);
-__exportStar(__nccwpck_require__(37881), exports);
-__exportStar(__nccwpck_require__(72890), exports);
-__exportStar(__nccwpck_require__(79592), exports);
-__exportStar(__nccwpck_require__(44160), exports);
-__exportStar(__nccwpck_require__(29570), exports);
-__exportStar(__nccwpck_require__(45242), exports);
-__exportStar(__nccwpck_require__(7966), exports);
-__exportStar(__nccwpck_require__(21676), exports);
-__exportStar(__nccwpck_require__(56207), exports);
-__exportStar(__nccwpck_require__(90082), exports);
-__exportStar(__nccwpck_require__(32104), exports);
-__exportStar(__nccwpck_require__(45426), exports);
-__exportStar(__nccwpck_require__(47138), exports);
-__exportStar(__nccwpck_require__(45210), exports);
-__exportStar(__nccwpck_require__(80395), exports);
-__exportStar(__nccwpck_require__(94469), exports);
-__exportStar(__nccwpck_require__(41274), exports);
-__exportStar(__nccwpck_require__(79990), exports);
-__exportStar(__nccwpck_require__(43888), exports);
-__exportStar(__nccwpck_require__(30152), exports);
-__exportStar(__nccwpck_require__(29186), exports);
-__exportStar(__nccwpck_require__(2678), exports);
-__exportStar(__nccwpck_require__(53193), exports);
-__exportStar(__nccwpck_require__(40891), exports);
-__exportStar(__nccwpck_require__(79077), exports);
-__exportStar(__nccwpck_require__(2880), exports);
-__exportStar(__nccwpck_require__(47499), exports);
-__exportStar(__nccwpck_require__(69452), exports);
-__exportStar(__nccwpck_require__(86871), exports);
-__exportStar(__nccwpck_require__(34661), exports);
-__exportStar(__nccwpck_require__(56166), exports);
-__exportStar(__nccwpck_require__(39379), exports);
-__exportStar(__nccwpck_require__(97528), exports);
-__exportStar(__nccwpck_require__(66700), exports);
 __exportStar(__nccwpck_require__(81959), exports);
-__exportStar(__nccwpck_require__(16879), exports);
 __exportStar(__nccwpck_require__(26032), exports);
+__exportStar(__nccwpck_require__(47499), exports);
+__exportStar(__nccwpck_require__(37173), exports);
+__exportStar(__nccwpck_require__(34879), exports);
+__exportStar(__nccwpck_require__(93297), exports);
+__exportStar(__nccwpck_require__(72767), exports);
+__exportStar(__nccwpck_require__(6375), exports);
+__exportStar(__nccwpck_require__(48063), exports);
+__exportStar(__nccwpck_require__(79706), exports);
+__exportStar(__nccwpck_require__(93217), exports);
+__exportStar(__nccwpck_require__(29730), exports);
+__exportStar(__nccwpck_require__(90643), exports);
+__exportStar(__nccwpck_require__(71751), exports);
+__exportStar(__nccwpck_require__(92887), exports);
+__exportStar(__nccwpck_require__(36281), exports);
+__exportStar(__nccwpck_require__(54798), exports);
+__exportStar(__nccwpck_require__(17275), exports);
+__exportStar(__nccwpck_require__(55896), exports);
+__exportStar(__nccwpck_require__(76141), exports);
+__exportStar(__nccwpck_require__(85225), exports);
+__exportStar(__nccwpck_require__(64160), exports);
+__exportStar(__nccwpck_require__(34378), exports);
+__exportStar(__nccwpck_require__(2880), exports);
+__exportStar(__nccwpck_require__(43829), exports);
+__exportStar(__nccwpck_require__(74046), exports);
+__exportStar(__nccwpck_require__(79120), exports);
+__exportStar(__nccwpck_require__(63128), exports);
+__exportStar(__nccwpck_require__(70925), exports);
+__exportStar(__nccwpck_require__(87091), exports);
+__exportStar(__nccwpck_require__(89883), exports);
+__exportStar(__nccwpck_require__(53610), exports);
+__exportStar(__nccwpck_require__(46744), exports);
+__exportStar(__nccwpck_require__(22421), exports);
+__exportStar(__nccwpck_require__(87871), exports);
+__exportStar(__nccwpck_require__(7966), exports);
+__exportStar(__nccwpck_require__(45242), exports);
+__exportStar(__nccwpck_require__(6967), exports);
+__exportStar(__nccwpck_require__(14498), exports);
+__exportStar(__nccwpck_require__(50110), exports);
+__exportStar(__nccwpck_require__(45426), exports);
+__exportStar(__nccwpck_require__(19629), exports);
+__exportStar(__nccwpck_require__(15780), exports);
+__exportStar(__nccwpck_require__(93580), exports);
+__exportStar(__nccwpck_require__(19048), exports);
+__exportStar(__nccwpck_require__(64169), exports);
+__exportStar(__nccwpck_require__(56207), exports);
+__exportStar(__nccwpck_require__(70908), exports);
+__exportStar(__nccwpck_require__(3592), exports);
+__exportStar(__nccwpck_require__(12613), exports);
+__exportStar(__nccwpck_require__(87306), exports);
+__exportStar(__nccwpck_require__(6589), exports);
+__exportStar(__nccwpck_require__(66094), exports);
+__exportStar(__nccwpck_require__(39206), exports);
+__exportStar(__nccwpck_require__(7426), exports);
+__exportStar(__nccwpck_require__(78896), exports);
+__exportStar(__nccwpck_require__(16879), exports);
 __exportStar(__nccwpck_require__(91192), exports);
 __exportStar(__nccwpck_require__(92224), exports);
-__exportStar(__nccwpck_require__(39740), exports);
-__exportStar(__nccwpck_require__(4859), exports);
-__exportStar(__nccwpck_require__(81473), exports);
-__exportStar(__nccwpck_require__(39206), exports);
-__exportStar(__nccwpck_require__(61977), exports);
-__exportStar(__nccwpck_require__(3037), exports);
+__exportStar(__nccwpck_require__(44160), exports);
 __exportStar(__nccwpck_require__(2475), exports);
-__exportStar(__nccwpck_require__(88884), exports);
-__exportStar(__nccwpck_require__(70733), exports);
-__exportStar(__nccwpck_require__(63128), exports);
-__exportStar(__nccwpck_require__(17671), exports);
-__exportStar(__nccwpck_require__(57845), exports);
-__exportStar(__nccwpck_require__(3259), exports);
-__exportStar(__nccwpck_require__(68912), exports);
-__exportStar(__nccwpck_require__(87660), exports);
-__exportStar(__nccwpck_require__(59688), exports);
-__exportStar(__nccwpck_require__(35245), exports);
-__exportStar(__nccwpck_require__(60277), exports);
-__exportStar(__nccwpck_require__(57010), exports);
+__exportStar(__nccwpck_require__(4859), exports);
+__exportStar(__nccwpck_require__(3037), exports);
 __exportStar(__nccwpck_require__(45459), exports);
-__exportStar(__nccwpck_require__(4362), exports);
-__exportStar(__nccwpck_require__(82799), exports);
-__exportStar(__nccwpck_require__(95134), exports);
-__exportStar(__nccwpck_require__(69285), exports);
-__exportStar(__nccwpck_require__(33858), exports);
-__exportStar(__nccwpck_require__(30589), exports);
-__exportStar(__nccwpck_require__(96942), exports);
-__exportStar(__nccwpck_require__(55171), exports);
-__exportStar(__nccwpck_require__(18230), exports);
-__exportStar(__nccwpck_require__(65318), exports);
-__exportStar(__nccwpck_require__(6967), exports);
-__exportStar(__nccwpck_require__(37302), exports);
-__exportStar(__nccwpck_require__(11943), exports);
-__exportStar(__nccwpck_require__(43491), exports);
-__exportStar(__nccwpck_require__(27794), exports);
-__exportStar(__nccwpck_require__(79120), exports);
-__exportStar(__nccwpck_require__(6589), exports);
-__exportStar(__nccwpck_require__(54416), exports);
-__exportStar(__nccwpck_require__(5385), exports);
-__exportStar(__nccwpck_require__(87001), exports);
-__exportStar(__nccwpck_require__(35976), exports);
-__exportStar(__nccwpck_require__(45903), exports);
-__exportStar(__nccwpck_require__(84486), exports);
-__exportStar(__nccwpck_require__(71466), exports);
-__exportStar(__nccwpck_require__(87611), exports);
-__exportStar(__nccwpck_require__(65909), exports);
-__exportStar(__nccwpck_require__(67751), exports);
-__exportStar(__nccwpck_require__(91954), exports);
-__exportStar(__nccwpck_require__(89684), exports);
-__exportStar(__nccwpck_require__(31815), exports);
-__exportStar(__nccwpck_require__(54677), exports);
-__exportStar(__nccwpck_require__(2304), exports);
-__exportStar(__nccwpck_require__(45057), exports);
-__exportStar(__nccwpck_require__(9465), exports);
-__exportStar(__nccwpck_require__(43718), exports);
-__exportStar(__nccwpck_require__(46049), exports);
-__exportStar(__nccwpck_require__(74168), exports);
-__exportStar(__nccwpck_require__(69414), exports);
-__exportStar(__nccwpck_require__(17694), exports);
-__exportStar(__nccwpck_require__(59245), exports);
-__exportStar(__nccwpck_require__(88300), exports);
-__exportStar(__nccwpck_require__(16430), exports);
-__exportStar(__nccwpck_require__(73935), exports);
-__exportStar(__nccwpck_require__(57815), exports);
-__exportStar(__nccwpck_require__(36383), exports);
-__exportStar(__nccwpck_require__(62538), exports);
-__exportStar(__nccwpck_require__(81082), exports);
-__exportStar(__nccwpck_require__(59764), exports);
+__exportStar(__nccwpck_require__(2033), exports);
 __exportStar(__nccwpck_require__(90020), exports);
-__exportStar(__nccwpck_require__(79695), exports);
 __exportStar(__nccwpck_require__(6999), exports);
-__exportStar(__nccwpck_require__(77549), exports);
-__exportStar(__nccwpck_require__(84812), exports);
-__exportStar(__nccwpck_require__(26784), exports);
-__exportStar(__nccwpck_require__(14147), exports);
-__exportStar(__nccwpck_require__(23449), exports);
+__exportStar(__nccwpck_require__(37302), exports);
+__exportStar(__nccwpck_require__(56166), exports);
 __exportStar(__nccwpck_require__(62967), exports);
-__exportStar(__nccwpck_require__(993), exports);
-__exportStar(__nccwpck_require__(53915), exports);
 __exportStar(__nccwpck_require__(81978), exports);
-__exportStar(__nccwpck_require__(25016), exports);
-__exportStar(__nccwpck_require__(18384), exports);
-__exportStar(__nccwpck_require__(80145), exports);
-__exportStar(__nccwpck_require__(42100), exports);
+__exportStar(__nccwpck_require__(35976), exports);
+__exportStar(__nccwpck_require__(89684), exports);
+__exportStar(__nccwpck_require__(91954), exports);
 __exportStar(__nccwpck_require__(67790), exports);
-__exportStar(__nccwpck_require__(97859), exports);
+__exportStar(__nccwpck_require__(42100), exports);
+__exportStar(__nccwpck_require__(80145), exports);
 __exportStar(__nccwpck_require__(16864), exports);
-__exportStar(__nccwpck_require__(78991), exports);
-__exportStar(__nccwpck_require__(10562), exports);
-__exportStar(__nccwpck_require__(54798), exports);
-__exportStar(__nccwpck_require__(98354), exports);
-__exportStar(__nccwpck_require__(50947), exports);
+__exportStar(__nccwpck_require__(32104), exports);
 __exportStar(__nccwpck_require__(37986), exports);
-__exportStar(__nccwpck_require__(32626), exports);
-__exportStar(__nccwpck_require__(30208), exports);
-__exportStar(__nccwpck_require__(37173), exports);
-__exportStar(__nccwpck_require__(54324), exports);
-__exportStar(__nccwpck_require__(2623), exports);
+__exportStar(__nccwpck_require__(50947), exports);
 __exportStar(__nccwpck_require__(87081), exports);
-__exportStar(__nccwpck_require__(72112), exports);
-__exportStar(__nccwpck_require__(2653), exports);
-__exportStar(__nccwpck_require__(68153), exports);
-__exportStar(__nccwpck_require__(20578), exports);
-__exportStar(__nccwpck_require__(86790), exports);
-__exportStar(__nccwpck_require__(17097), exports);
-__exportStar(__nccwpck_require__(29423), exports);
-__exportStar(__nccwpck_require__(48951), exports);
+__exportStar(__nccwpck_require__(2623), exports);
 __exportStar(__nccwpck_require__(97885), exports);
 __exportStar(__nccwpck_require__(52665), exports);
-__exportStar(__nccwpck_require__(54099), exports);
-__exportStar(__nccwpck_require__(65056), exports);
-__exportStar(__nccwpck_require__(60986), exports);
-__exportStar(__nccwpck_require__(9234), exports);
-__exportStar(__nccwpck_require__(5976), exports);
-__exportStar(__nccwpck_require__(16953), exports);
-__exportStar(__nccwpck_require__(34378), exports);
-__exportStar(__nccwpck_require__(78896), exports);
-__exportStar(__nccwpck_require__(60043), exports);
-__exportStar(__nccwpck_require__(75641), exports);
-__exportStar(__nccwpck_require__(34879), exports);
+__exportStar(__nccwpck_require__(29423), exports);
+__exportStar(__nccwpck_require__(79864), exports);
+__exportStar(__nccwpck_require__(88300), exports);
+__exportStar(__nccwpck_require__(57815), exports);
+__exportStar(__nccwpck_require__(61977), exports);
 __exportStar(__nccwpck_require__(53842), exports);
-__exportStar(__nccwpck_require__(74046), exports);
+__exportStar(__nccwpck_require__(85550), exports);
+__exportStar(__nccwpck_require__(75762), exports);
+__exportStar(__nccwpck_require__(9169), exports);
+__exportStar(__nccwpck_require__(42943), exports);
+__exportStar(__nccwpck_require__(30433), exports);
+__exportStar(__nccwpck_require__(8558), exports);
+__exportStar(__nccwpck_require__(31937), exports);
+__exportStar(__nccwpck_require__(35353), exports);
 __exportStar(__nccwpck_require__(42181), exports);
 __exportStar(__nccwpck_require__(90059), exports);
-__exportStar(__nccwpck_require__(76744), exports);
-__exportStar(__nccwpck_require__(5360), exports);
-__exportStar(__nccwpck_require__(48837), exports);
-__exportStar(__nccwpck_require__(14498), exports);
-__exportStar(__nccwpck_require__(9169), exports);
-__exportStar(__nccwpck_require__(85550), exports);
-__exportStar(__nccwpck_require__(93297), exports);
-__exportStar(__nccwpck_require__(92391), exports);
-__exportStar(__nccwpck_require__(8558), exports);
-__exportStar(__nccwpck_require__(54038), exports);
-__exportStar(__nccwpck_require__(43455), exports);
-__exportStar(__nccwpck_require__(35353), exports);
-__exportStar(__nccwpck_require__(51291), exports);
-__exportStar(__nccwpck_require__(31937), exports);
-__exportStar(__nccwpck_require__(78115), exports);
 __exportStar(__nccwpck_require__(27775), exports);
-__exportStar(__nccwpck_require__(6375), exports);
-__exportStar(__nccwpck_require__(47854), exports);
-__exportStar(__nccwpck_require__(4412), exports);
 __exportStar(__nccwpck_require__(66263), exports);
-__exportStar(__nccwpck_require__(67386), exports);
-__exportStar(__nccwpck_require__(87584), exports);
-__exportStar(__nccwpck_require__(33156), exports);
-__exportStar(__nccwpck_require__(33716), exports);
-__exportStar(__nccwpck_require__(39038), exports);
-__exportStar(__nccwpck_require__(93217), exports);
-__exportStar(__nccwpck_require__(79048), exports);
-__exportStar(__nccwpck_require__(2033), exports);
-__exportStar(__nccwpck_require__(75762), exports);
-__exportStar(__nccwpck_require__(85141), exports);
-__exportStar(__nccwpck_require__(72944), exports);
-__exportStar(__nccwpck_require__(10965), exports);
-__exportStar(__nccwpck_require__(1817), exports);
-__exportStar(__nccwpck_require__(62583), exports);
-__exportStar(__nccwpck_require__(72767), exports);
-__exportStar(__nccwpck_require__(7426), exports);
-__exportStar(__nccwpck_require__(88846), exports);
-__exportStar(__nccwpck_require__(20727), exports);
-__exportStar(__nccwpck_require__(45109), exports);
-__exportStar(__nccwpck_require__(40105), exports);
-__exportStar(__nccwpck_require__(92657), exports);
-__exportStar(__nccwpck_require__(54884), exports);
-__exportStar(__nccwpck_require__(46880), exports);
-__exportStar(__nccwpck_require__(5247), exports);
-__exportStar(__nccwpck_require__(3087), exports);
-__exportStar(__nccwpck_require__(14846), exports);
-__exportStar(__nccwpck_require__(35283), exports);
-__exportStar(__nccwpck_require__(42831), exports);
-__exportStar(__nccwpck_require__(90684), exports);
-__exportStar(__nccwpck_require__(17191), exports);
-__exportStar(__nccwpck_require__(28042), exports);
-__exportStar(__nccwpck_require__(12074), exports);
-__exportStar(__nccwpck_require__(87389), exports);
-__exportStar(__nccwpck_require__(21974), exports);
-__exportStar(__nccwpck_require__(43599), exports);
-__exportStar(__nccwpck_require__(66391), exports);
-__exportStar(__nccwpck_require__(98934), exports);
-__exportStar(__nccwpck_require__(45985), exports);
-__exportStar(__nccwpck_require__(52500), exports);
-__exportStar(__nccwpck_require__(80993), exports);
-__exportStar(__nccwpck_require__(33547), exports);
-__exportStar(__nccwpck_require__(45044), exports);
-__exportStar(__nccwpck_require__(11158), exports);
-__exportStar(__nccwpck_require__(14018), exports);
-__exportStar(__nccwpck_require__(84080), exports);
-__exportStar(__nccwpck_require__(11415), exports);
-__exportStar(__nccwpck_require__(24236), exports);
-__exportStar(__nccwpck_require__(92629), exports);
-__exportStar(__nccwpck_require__(76785), exports);
-__exportStar(__nccwpck_require__(76141), exports);
-__exportStar(__nccwpck_require__(77926), exports);
-__exportStar(__nccwpck_require__(85521), exports);
-__exportStar(__nccwpck_require__(69357), exports);
 __exportStar(__nccwpck_require__(87835), exports);
-__exportStar(__nccwpck_require__(62082), exports);
-__exportStar(__nccwpck_require__(6796), exports);
-__exportStar(__nccwpck_require__(75025), exports);
-__exportStar(__nccwpck_require__(56150), exports);
-__exportStar(__nccwpck_require__(97461), exports);
+__exportStar(__nccwpck_require__(80230), exports);
+__exportStar(__nccwpck_require__(55557), exports);
+__exportStar(__nccwpck_require__(47138), exports);
+__exportStar(__nccwpck_require__(24236), exports);
+__exportStar(__nccwpck_require__(76785), exports);
+__exportStar(__nccwpck_require__(45109), exports);
+__exportStar(__nccwpck_require__(20727), exports);
+__exportStar(__nccwpck_require__(46880), exports);
+__exportStar(__nccwpck_require__(87389), exports);
+__exportStar(__nccwpck_require__(14846), exports);
+__exportStar(__nccwpck_require__(5247), exports);
+__exportStar(__nccwpck_require__(54884), exports);
+__exportStar(__nccwpck_require__(85141), exports);
+__exportStar(__nccwpck_require__(98934), exports);
+__exportStar(__nccwpck_require__(66391), exports);
+__exportStar(__nccwpck_require__(43718), exports);
+__exportStar(__nccwpck_require__(2304), exports);
 __exportStar(__nccwpck_require__(61779), exports);
-__exportStar(__nccwpck_require__(79706), exports);
-__exportStar(__nccwpck_require__(41836), exports);
-__exportStar(__nccwpck_require__(28558), exports);
-__exportStar(__nccwpck_require__(35653), exports);
-__exportStar(__nccwpck_require__(16352), exports);
-__exportStar(__nccwpck_require__(48063), exports);
-__exportStar(__nccwpck_require__(808), exports);
-__exportStar(__nccwpck_require__(83759), exports);
-__exportStar(__nccwpck_require__(84810), exports);
+__exportStar(__nccwpck_require__(29186), exports);
 __exportStar(__nccwpck_require__(67316), exports);
-__exportStar(__nccwpck_require__(62376), exports);
-__exportStar(__nccwpck_require__(18026), exports);
-__exportStar(__nccwpck_require__(30059), exports);
+__exportStar(__nccwpck_require__(30152), exports);
+__exportStar(__nccwpck_require__(85521), exports);
+__exportStar(__nccwpck_require__(86871), exports);
+__exportStar(__nccwpck_require__(60277), exports);
+__exportStar(__nccwpck_require__(59688), exports);
 __exportStar(__nccwpck_require__(84118), exports);
 __exportStar(__nccwpck_require__(23697), exports);
 __exportStar(__nccwpck_require__(72390), exports);
-__exportStar(__nccwpck_require__(76034), exports);
+__exportStar(__nccwpck_require__(5385), exports);
 __exportStar(__nccwpck_require__(6562), exports);
-__exportStar(__nccwpck_require__(62916), exports);
-__exportStar(__nccwpck_require__(76644), exports);
-__exportStar(__nccwpck_require__(99683), exports);
-__exportStar(__nccwpck_require__(87084), exports);
 __exportStar(__nccwpck_require__(617), exports);
-__exportStar(__nccwpck_require__(98251), exports);
-__exportStar(__nccwpck_require__(8917), exports);
 __exportStar(__nccwpck_require__(99935), exports);
 __exportStar(__nccwpck_require__(87955), exports);
 __exportStar(__nccwpck_require__(81596), exports);
-__exportStar(__nccwpck_require__(71751), exports);
-__exportStar(__nccwpck_require__(90643), exports);
-__exportStar(__nccwpck_require__(94537), exports);
-__exportStar(__nccwpck_require__(4833), exports);
-__exportStar(__nccwpck_require__(73420), exports);
-__exportStar(__nccwpck_require__(27409), exports);
-__exportStar(__nccwpck_require__(97346), exports);
-__exportStar(__nccwpck_require__(28826), exports);
-__exportStar(__nccwpck_require__(18965), exports);
-__exportStar(__nccwpck_require__(16435), exports);
-__exportStar(__nccwpck_require__(66721), exports);
 __exportStar(__nccwpck_require__(38216), exports);
-__exportStar(__nccwpck_require__(21055), exports);
-__exportStar(__nccwpck_require__(81839), exports);
-__exportStar(__nccwpck_require__(87306), exports);
-__exportStar(__nccwpck_require__(83252), exports);
-__exportStar(__nccwpck_require__(19368), exports);
-__exportStar(__nccwpck_require__(66094), exports);
-__exportStar(__nccwpck_require__(18240), exports);
-__exportStar(__nccwpck_require__(92887), exports);
-__exportStar(__nccwpck_require__(66844), exports);
-__exportStar(__nccwpck_require__(85010), exports);
-__exportStar(__nccwpck_require__(73009), exports);
-__exportStar(__nccwpck_require__(31082), exports);
-__exportStar(__nccwpck_require__(41046), exports);
-__exportStar(__nccwpck_require__(44399), exports);
-__exportStar(__nccwpck_require__(95429), exports);
-__exportStar(__nccwpck_require__(98440), exports);
-__exportStar(__nccwpck_require__(92344), exports);
-__exportStar(__nccwpck_require__(94612), exports);
-__exportStar(__nccwpck_require__(36281), exports);
-__exportStar(__nccwpck_require__(96217), exports);
-__exportStar(__nccwpck_require__(91534), exports);
-__exportStar(__nccwpck_require__(61465), exports);
-__exportStar(__nccwpck_require__(16997), exports);
-__exportStar(__nccwpck_require__(70908), exports);
-__exportStar(__nccwpck_require__(39639), exports);
-__exportStar(__nccwpck_require__(45639), exports);
-__exportStar(__nccwpck_require__(59998), exports);
-__exportStar(__nccwpck_require__(86852), exports);
-__exportStar(__nccwpck_require__(26498), exports);
+__exportStar(__nccwpck_require__(66721), exports);
+__exportStar(__nccwpck_require__(69285), exports);
+__exportStar(__nccwpck_require__(56150), exports);
+__exportStar(__nccwpck_require__(97461), exports);
+__exportStar(__nccwpck_require__(52500), exports);
+__exportStar(__nccwpck_require__(14018), exports);
+__exportStar(__nccwpck_require__(11415), exports);
+__exportStar(__nccwpck_require__(34661), exports);
+__exportStar(__nccwpck_require__(69414), exports);
 __exportStar(__nccwpck_require__(2080), exports);
-__exportStar(__nccwpck_require__(50763), exports);
-__exportStar(__nccwpck_require__(25685), exports);
-__exportStar(__nccwpck_require__(400), exports);
-__exportStar(__nccwpck_require__(38484), exports);
-__exportStar(__nccwpck_require__(95869), exports);
-__exportStar(__nccwpck_require__(11300), exports);
+__exportStar(__nccwpck_require__(91534), exports);
 __exportStar(__nccwpck_require__(34241), exports);
-__exportStar(__nccwpck_require__(65074), exports);
-__exportStar(__nccwpck_require__(18779), exports);
-__exportStar(__nccwpck_require__(3592), exports);
-__exportStar(__nccwpck_require__(47615), exports);
-__exportStar(__nccwpck_require__(58247), exports);
 __exportStar(__nccwpck_require__(944), exports);
-__exportStar(__nccwpck_require__(83271), exports);
-__exportStar(__nccwpck_require__(2980), exports);
-__exportStar(__nccwpck_require__(12613), exports);
-__exportStar(__nccwpck_require__(76000), exports);
-__exportStar(__nccwpck_require__(90700), exports);
-__exportStar(__nccwpck_require__(32800), exports);
-__exportStar(__nccwpck_require__(29129), exports);
+__exportStar(__nccwpck_require__(59998), exports);
+__exportStar(__nccwpck_require__(400), exports);
+__exportStar(__nccwpck_require__(85010), exports);
+__exportStar(__nccwpck_require__(95429), exports);
+__exportStar(__nccwpck_require__(31082), exports);
+__exportStar(__nccwpck_require__(62538), exports);
+__exportStar(__nccwpck_require__(84812), exports);
+__exportStar(__nccwpck_require__(77549), exports);
+__exportStar(__nccwpck_require__(79695), exports);
+__exportStar(__nccwpck_require__(23449), exports);
+__exportStar(__nccwpck_require__(45903), exports);
+__exportStar(__nccwpck_require__(45044), exports);
+__exportStar(__nccwpck_require__(75641), exports);
+__exportStar(__nccwpck_require__(16352), exports);
+__exportStar(__nccwpck_require__(84810), exports);
+__exportStar(__nccwpck_require__(11158), exports);
+__exportStar(__nccwpck_require__(54416), exports);
+__exportStar(__nccwpck_require__(60043), exports);
+__exportStar(__nccwpck_require__(35283), exports);
+__exportStar(__nccwpck_require__(37035), exports);
 __exportStar(__nccwpck_require__(37687), exports);
-__exportStar(__nccwpck_require__(1678), exports);
+__exportStar(__nccwpck_require__(18240), exports);
+__exportStar(__nccwpck_require__(83252), exports);
 __exportStar(__nccwpck_require__(4160), exports);
+__exportStar(__nccwpck_require__(587), exports);
+__exportStar(__nccwpck_require__(43888), exports);
+__exportStar(__nccwpck_require__(82799), exports);
+__exportStar(__nccwpck_require__(17097), exports);
+__exportStar(__nccwpck_require__(41274), exports);
+__exportStar(__nccwpck_require__(16953), exports);
 __exportStar(__nccwpck_require__(37938), exports);
+__exportStar(__nccwpck_require__(5360), exports);
+__exportStar(__nccwpck_require__(6796), exports);
+__exportStar(__nccwpck_require__(83759), exports);
+__exportStar(__nccwpck_require__(76644), exports);
+__exportStar(__nccwpck_require__(30589), exports);
+__exportStar(__nccwpck_require__(59245), exports);
+__exportStar(__nccwpck_require__(73935), exports);
+__exportStar(__nccwpck_require__(28558), exports);
+__exportStar(__nccwpck_require__(24323), exports);
+__exportStar(__nccwpck_require__(86790), exports);
+__exportStar(__nccwpck_require__(66700), exports);
+__exportStar(__nccwpck_require__(57845), exports);
+__exportStar(__nccwpck_require__(8917), exports);
+__exportStar(__nccwpck_require__(39038), exports);
+__exportStar(__nccwpck_require__(84486), exports);
+__exportStar(__nccwpck_require__(71466), exports);
+__exportStar(__nccwpck_require__(4412), exports);
+__exportStar(__nccwpck_require__(92780), exports);
+__exportStar(__nccwpck_require__(28042), exports);
+__exportStar(__nccwpck_require__(11338), exports);
+__exportStar(__nccwpck_require__(17671), exports);
+__exportStar(__nccwpck_require__(39670), exports);
+__exportStar(__nccwpck_require__(60258), exports);
+__exportStar(__nccwpck_require__(87660), exports);
+__exportStar(__nccwpck_require__(90082), exports);
+__exportStar(__nccwpck_require__(3259), exports);
+__exportStar(__nccwpck_require__(31815), exports);
+__exportStar(__nccwpck_require__(32626), exports);
+__exportStar(__nccwpck_require__(48837), exports);
+__exportStar(__nccwpck_require__(76744), exports);
+__exportStar(__nccwpck_require__(40105), exports);
+__exportStar(__nccwpck_require__(47033), exports);
+__exportStar(__nccwpck_require__(98251), exports);
+__exportStar(__nccwpck_require__(21055), exports);
+__exportStar(__nccwpck_require__(83271), exports);
+__exportStar(__nccwpck_require__(86852), exports);
+__exportStar(__nccwpck_require__(26784), exports);
+__exportStar(__nccwpck_require__(57854), exports);
+__exportStar(__nccwpck_require__(88846), exports);
+__exportStar(__nccwpck_require__(42704), exports);
+__exportStar(__nccwpck_require__(34985), exports);
+__exportStar(__nccwpck_require__(29570), exports);
+__exportStar(__nccwpck_require__(12545), exports);
+__exportStar(__nccwpck_require__(45210), exports);
+__exportStar(__nccwpck_require__(25305), exports);
+__exportStar(__nccwpck_require__(50857), exports);
+__exportStar(__nccwpck_require__(56705), exports);
+__exportStar(__nccwpck_require__(9841), exports);
+__exportStar(__nccwpck_require__(5976), exports);
+__exportStar(__nccwpck_require__(39639), exports);
+__exportStar(__nccwpck_require__(47615), exports);
+__exportStar(__nccwpck_require__(76000), exports);
+__exportStar(__nccwpck_require__(88884), exports);
+__exportStar(__nccwpck_require__(39379), exports);
+__exportStar(__nccwpck_require__(25016), exports);
+__exportStar(__nccwpck_require__(78991), exports);
+__exportStar(__nccwpck_require__(2653), exports);
+__exportStar(__nccwpck_require__(65056), exports);
+__exportStar(__nccwpck_require__(54038), exports);
+__exportStar(__nccwpck_require__(67386), exports);
+__exportStar(__nccwpck_require__(10965), exports);
+__exportStar(__nccwpck_require__(62082), exports);
+__exportStar(__nccwpck_require__(92629), exports);
+__exportStar(__nccwpck_require__(79048), exports);
+__exportStar(__nccwpck_require__(46049), exports);
+__exportStar(__nccwpck_require__(40891), exports);
+__exportStar(__nccwpck_require__(18026), exports);
+__exportStar(__nccwpck_require__(80993), exports);
+__exportStar(__nccwpck_require__(50763), exports);
+__exportStar(__nccwpck_require__(61465), exports);
+__exportStar(__nccwpck_require__(65074), exports);
+__exportStar(__nccwpck_require__(92344), exports);
+__exportStar(__nccwpck_require__(41046), exports);
+__exportStar(__nccwpck_require__(81082), exports);
+__exportStar(__nccwpck_require__(75025), exports);
 //# sourceMappingURL=index.js.map
 
 /***/ }),
@@ -46260,6 +47532,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 //# sourceMappingURL=partialUpdateProjectRole.js.map
+
+/***/ }),
+
+/***/ 37035:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=publishDraftWorkflowScheme.js.map
 
 /***/ }),
 
@@ -46793,6 +48075,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 /***/ }),
 
+/***/ 12545:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+//# sourceMappingURL=updateCustomFieldConfiguration.js.map
+
+/***/ }),
+
 /***/ 45210:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -47142,7 +48434,9 @@ class PermissionSchemes {
                     expand: parameters === null || parameters === void 0 ? void 0 : parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.permissionSchemes.getAllPermissionSchemes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.permissionSchemes.getAllPermissionSchemes',
+            });
         });
     }
     createPermissionScheme(parameters, callback) {
@@ -47155,7 +48449,9 @@ class PermissionSchemes {
                 },
                 data: Object.assign(Object.assign({}, parameters), { expand: undefined }),
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.permissionSchemes.createPermissionScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.permissionSchemes.createPermissionScheme',
+            });
         });
     }
     getPermissionScheme(parameters, callback) {
@@ -47180,7 +48476,9 @@ class PermissionSchemes {
                 },
                 data: Object.assign(Object.assign({}, parameters), { schemeId: undefined, expand: undefined }),
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.permissionSchemes.updatePermissionScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.permissionSchemes.updatePermissionScheme',
+            });
         });
     }
     deletePermissionScheme(parameters, callback) {
@@ -47189,7 +48487,9 @@ class PermissionSchemes {
                 url: `/rest/api/3/permissionscheme/${parameters.schemeId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.permissionSchemes.deletePermissionScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.permissionSchemes.deletePermissionScheme',
+            });
         });
     }
     getPermissionSchemeGrants(parameters, callback) {
@@ -47201,7 +48501,9 @@ class PermissionSchemes {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.permissionSchemes.getPermissionSchemeGrants' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.permissionSchemes.getPermissionSchemeGrants',
+            });
         });
     }
     createPermissionGrant(parameters, callback) {
@@ -47219,7 +48521,9 @@ class PermissionSchemes {
                     permission: parameters.permission,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.permissionSchemes.createPermissionGrant' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.permissionSchemes.createPermissionGrant',
+            });
         });
     }
     getPermissionSchemeGrant(parameters, callback) {
@@ -47231,7 +48535,9 @@ class PermissionSchemes {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.permissionSchemes.getPermissionSchemeGrant' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.permissionSchemes.getPermissionSchemeGrant',
+            });
         });
     }
     deletePermissionSchemeEntity(parameters, callback) {
@@ -47240,7 +48546,9 @@ class PermissionSchemes {
                 url: `/rest/api/3/permissionscheme/${parameters.schemeId}/permission/${parameters.permissionId}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.permissionSchemes.deletePermissionSchemeEntity' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.permissionSchemes.deletePermissionSchemeEntity',
+            });
         });
     }
 }
@@ -47430,7 +48738,9 @@ class ProjectCategories {
                 url: '/rest/api/3/projectCategory',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectCategories.getAllProjectCategories' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectCategories.getAllProjectCategories',
+            });
         });
     }
     createProjectCategory(parameters, callback) {
@@ -47445,7 +48755,9 @@ class ProjectCategories {
                     description: parameters === null || parameters === void 0 ? void 0 : parameters.description,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectCategories.createProjectCategory' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectCategories.createProjectCategory',
+            });
         });
     }
     getProjectCategoryById(parameters, callback) {
@@ -47454,7 +48766,9 @@ class ProjectCategories {
                 url: `/rest/api/3/projectCategory/${parameters.id}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectCategories.getProjectCategoryById' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectCategories.getProjectCategoryById',
+            });
         });
     }
     updateProjectCategory(parameters, callback) {
@@ -47467,7 +48781,9 @@ class ProjectCategories {
                     description: parameters.description,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectCategories.updateProjectCategory' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectCategories.updateProjectCategory',
+            });
         });
     }
     removeProjectCategory(parameters, callback) {
@@ -47476,7 +48792,9 @@ class ProjectCategories {
                 url: `/rest/api/3/projectCategory/${parameters.id}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectCategories.removeProjectCategory' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectCategories.removeProjectCategory',
+            });
         });
     }
 }
@@ -47574,7 +48892,9 @@ class ProjectComponents {
                 url: `/rest/api/3/component/${parameters.id}/relatedIssueCounts`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectComponents.getComponentRelatedIssues' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectComponents.getComponentRelatedIssues',
+            });
         });
     }
     getProjectComponentsPaginated(parameters, callback) {
@@ -47589,7 +48909,9 @@ class ProjectComponents {
                     query: parameters.query,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectComponents.getProjectComponentsPaginated' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectComponents.getProjectComponentsPaginated',
+            });
         });
     }
     getProjectComponents(parameters, callback) {
@@ -47692,7 +49014,9 @@ class ProjectFeatures {
                     state: parameters.state,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectFeatures.toggleFeatureForProject' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectFeatures.toggleFeatureForProject',
+            });
         });
     }
 }
@@ -47730,7 +49054,9 @@ class ProjectKeyAndNameValidation {
                     key: parameters === null || parameters === void 0 ? void 0 : parameters.key,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectKeyAndNameValidation.validateProjectKey' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectKeyAndNameValidation.validateProjectKey',
+            });
         });
     }
     getValidProjectKey(parameters, callback) {
@@ -47742,7 +49068,9 @@ class ProjectKeyAndNameValidation {
                     key: parameters === null || parameters === void 0 ? void 0 : parameters.key,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectKeyAndNameValidation.getValidProjectKey' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectKeyAndNameValidation.getValidProjectKey',
+            });
         });
     }
     getValidProjectName(parameters, callback) {
@@ -47754,7 +49082,9 @@ class ProjectKeyAndNameValidation {
                     name: parameters.name,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectKeyAndNameValidation.getValidProjectName' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectKeyAndNameValidation.getValidProjectName',
+            });
         });
     }
 }
@@ -47789,7 +49119,9 @@ class ProjectPermissionSchemes {
                 url: `/rest/api/3/project/${parameters.projectKeyOrId}/issuesecuritylevelscheme`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectPermissionSchemes.getProjectIssueSecurityScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectPermissionSchemes.getProjectIssueSecurityScheme',
+            });
         });
     }
     getAssignedPermissionScheme(parameters, callback) {
@@ -47801,7 +49133,9 @@ class ProjectPermissionSchemes {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectPermissionSchemes.getAssignedPermissionScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectPermissionSchemes.getAssignedPermissionScheme',
+            });
         });
     }
     assignPermissionScheme(parameters, callback) {
@@ -47816,7 +49150,9 @@ class ProjectPermissionSchemes {
                     id: parameters.id,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectPermissionSchemes.assignPermissionScheme' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectPermissionSchemes.assignPermissionScheme',
+            });
         });
     }
     getSecurityLevelsForProject(parameters, callback) {
@@ -47825,7 +49161,9 @@ class ProjectPermissionSchemes {
                 url: `/rest/api/3/project/${parameters.projectKeyOrId}/securitylevel`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectPermissionSchemes.getSecurityLevelsForProject' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectPermissionSchemes.getSecurityLevelsForProject',
+            });
         });
     }
 }
@@ -47860,7 +49198,9 @@ class ProjectProperties {
                 url: `/rest/api/3/project/${parameters.projectIdOrKey}/properties`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectProperties.getProjectPropertyKeys' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectProperties.getProjectPropertyKeys',
+            });
         });
     }
     getProjectProperty(parameters, callback) {
@@ -47887,7 +49227,9 @@ class ProjectProperties {
                 url: `/rest/api/3/project/${parameters.projectIdOrKey}/properties/${parameters.propertyKey}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectProperties.deleteProjectProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectProperties.deleteProjectProperty',
+            });
         });
     }
 }
@@ -47960,7 +49302,9 @@ class ProjectRoleActors {
                 url: `/rest/api/3/role/${parameters.id}/actors`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectRoleActors.getProjectRoleActorsForRole' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectRoleActors.getProjectRoleActorsForRole',
+            });
         });
     }
     addProjectRoleActorsToRole(parameters, callback) {
@@ -47973,7 +49317,9 @@ class ProjectRoleActors {
                     group: parameters.group,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectRoleActors.addProjectRoleActorsToRole' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectRoleActors.addProjectRoleActorsToRole',
+            });
         });
     }
     deleteProjectRoleActorsFromRole(parameters, callback) {
@@ -47986,7 +49332,9 @@ class ProjectRoleActors {
                     group: parameters.group,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectRoleActors.deleteProjectRoleActorsFromRole' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectRoleActors.deleteProjectRoleActorsFromRole',
+            });
         });
     }
 }
@@ -48156,7 +49504,9 @@ class ProjectTypes {
                 url: '/rest/api/3/project/type/accessible',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectTypes.getAllAccessibleProjectTypes' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectTypes.getAllAccessibleProjectTypes',
+            });
         });
     }
     getProjectTypeByKey(parameters, callback) {
@@ -48174,7 +49524,9 @@ class ProjectTypes {
                 url: `/rest/api/3/project/type/${parameters.projectTypeKey}/accessible`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectTypes.getAccessibleProjectTypeByKey' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectTypes.getAccessibleProjectTypeByKey',
+            });
         });
     }
 }
@@ -48217,7 +49569,9 @@ class ProjectVersions {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectVersions.getProjectVersionsPaginated' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectVersions.getProjectVersionsPaginated',
+            });
         });
     }
     getProjectVersions(parameters, callback) {
@@ -48334,7 +49688,9 @@ class ProjectVersions {
                 url: `/rest/api/3/version/${parameters.id}/relatedIssueCounts`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectVersions.getVersionRelatedIssues' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectVersions.getVersionRelatedIssues',
+            });
         });
     }
     deleteAndReplaceVersion(parameters, callback) {
@@ -48348,7 +49704,9 @@ class ProjectVersions {
                     customFieldReplacementList: parameters.customFieldReplacementList,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectVersions.deleteAndReplaceVersion' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectVersions.deleteAndReplaceVersion',
+            });
         });
     }
     getVersionUnresolvedIssues(parameters, callback) {
@@ -48357,7 +49715,9 @@ class ProjectVersions {
                 url: `/rest/api/3/version/${parameters.id}/unresolvedIssueCount`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projectVersions.getVersionUnresolvedIssues' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projectVersions.getVersionUnresolvedIssues',
+            });
         });
     }
 }
@@ -48406,20 +49766,24 @@ class Projects {
                 url: '/rest/api/3/project',
                 method: 'POST',
                 data: {
-                    key: parameters === null || parameters === void 0 ? void 0 : parameters.key,
-                    name: parameters === null || parameters === void 0 ? void 0 : parameters.name,
-                    projectTypeKey: parameters === null || parameters === void 0 ? void 0 : parameters.projectTypeKey,
-                    projectTemplateKey: parameters === null || parameters === void 0 ? void 0 : parameters.projectTemplateKey,
-                    description: parameters === null || parameters === void 0 ? void 0 : parameters.description,
-                    lead: parameters === null || parameters === void 0 ? void 0 : parameters.lead,
-                    leadAccountId: parameters === null || parameters === void 0 ? void 0 : parameters.leadAccountId,
-                    url: parameters === null || parameters === void 0 ? void 0 : parameters.url,
-                    assigneeType: parameters === null || parameters === void 0 ? void 0 : parameters.assigneeType,
-                    avatarId: parameters === null || parameters === void 0 ? void 0 : parameters.avatarId,
-                    issueSecurityScheme: parameters === null || parameters === void 0 ? void 0 : parameters.issueSecurityScheme,
-                    permissionScheme: parameters === null || parameters === void 0 ? void 0 : parameters.permissionScheme,
-                    notificationScheme: parameters === null || parameters === void 0 ? void 0 : parameters.notificationScheme,
-                    categoryId: parameters === null || parameters === void 0 ? void 0 : parameters.categoryId,
+                    key: parameters.key,
+                    name: parameters.name,
+                    description: parameters.description,
+                    lead: parameters.lead,
+                    leadAccountId: parameters.leadAccountId,
+                    url: parameters.url,
+                    assigneeType: parameters.assigneeType,
+                    avatarId: parameters.avatarId,
+                    issueSecurityScheme: parameters.issueSecurityScheme,
+                    permissionScheme: parameters.permissionScheme,
+                    notificationScheme: parameters.notificationScheme,
+                    categoryId: parameters.categoryId,
+                    projectTypeKey: parameters.projectTypeKey,
+                    projectTemplateKey: parameters.projectTemplateKey,
+                    workflowScheme: parameters.workflowScheme,
+                    issueTypeScreenScheme: parameters.issueTypeScreenScheme,
+                    issueTypeScheme: parameters.issueTypeScheme,
+                    fieldConfigurationScheme: parameters.fieldConfigurationScheme,
                 },
             };
             return this.client.sendRequest(config, callback, { methodName: 'version3.projects.createProject' });
@@ -48434,12 +49798,15 @@ class Projects {
                     startAt: parameters === null || parameters === void 0 ? void 0 : parameters.startAt,
                     maxResults: parameters === null || parameters === void 0 ? void 0 : parameters.maxResults,
                     orderBy: parameters === null || parameters === void 0 ? void 0 : parameters.orderBy,
+                    id: parameters === null || parameters === void 0 ? void 0 : parameters.id,
                     query: parameters === null || parameters === void 0 ? void 0 : parameters.query,
                     typeKey: parameters === null || parameters === void 0 ? void 0 : parameters.typeKey,
                     categoryId: parameters === null || parameters === void 0 ? void 0 : parameters.categoryId,
                     action: parameters === null || parameters === void 0 ? void 0 : parameters.action,
                     expand: parameters === null || parameters === void 0 ? void 0 : parameters.expand,
                     status: parameters === null || parameters === void 0 ? void 0 : parameters.status,
+                    properties: parameters === null || parameters === void 0 ? void 0 : parameters.properties,
+                    propertyQuery: parameters === null || parameters === void 0 ? void 0 : parameters.propertyQuery,
                 },
             };
             return this.client.sendRequest(config, callback, { methodName: 'version3.projects.searchProjects' });
@@ -48561,7 +49928,9 @@ class Projects {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.projects.getNotificationSchemeForProject' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.projects.getNotificationSchemeForProject',
+            });
         });
     }
 }
@@ -49013,7 +50382,9 @@ class TimeTracking {
                 url: '/rest/api/3/configuration/timetracking',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.timeTracking.getSelectedTimeTrackingImplementation' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.timeTracking.getSelectedTimeTrackingImplementation',
+            });
         });
     }
     selectTimeTrackingImplementation(parameters, callback) {
@@ -49027,7 +50398,9 @@ class TimeTracking {
                     url: parameters === null || parameters === void 0 ? void 0 : parameters.url,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.timeTracking.selectTimeTrackingImplementation' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.timeTracking.selectTimeTrackingImplementation',
+            });
         });
     }
     getAvailableTimeTrackingImplementations(callback) {
@@ -49036,7 +50409,9 @@ class TimeTracking {
                 url: '/rest/api/3/configuration/timetracking/list',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.timeTracking.getAvailableTimeTrackingImplementations' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.timeTracking.getAvailableTimeTrackingImplementations',
+            });
         });
     }
     getSharedTimeTrackingConfiguration(callback) {
@@ -49045,7 +50420,9 @@ class TimeTracking {
                 url: '/rest/api/3/configuration/timetracking/options',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.timeTracking.getSharedTimeTrackingConfiguration' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.timeTracking.getSharedTimeTrackingConfiguration',
+            });
         });
     }
     setSharedTimeTrackingConfiguration(parameters, callback) {
@@ -49060,7 +50437,9 @@ class TimeTracking {
                     defaultUnit: parameters === null || parameters === void 0 ? void 0 : parameters.defaultUnit,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.timeTracking.setSharedTimeTrackingConfiguration' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.timeTracking.setSharedTimeTrackingConfiguration',
+            });
         });
     }
 }
@@ -49306,7 +50685,9 @@ class UserSearch {
                     maxResults: parameters === null || parameters === void 0 ? void 0 : parameters.maxResults,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.userSearch.findUsersWithBrowsePermission' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.userSearch.findUsersWithBrowsePermission',
+            });
         });
     }
 }
@@ -49637,7 +51018,9 @@ class WorkflowSchemeDrafts {
                 url: `/rest/api/3/workflowscheme/${parameters.id}/createdraft`,
                 method: 'POST',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemeDrafts.createWorkflowSchemeDraftFromParent' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemeDrafts.createWorkflowSchemeDraftFromParent',
+            });
         });
     }
     getWorkflowSchemeDraft(parameters, callback) {
@@ -49646,7 +51029,9 @@ class WorkflowSchemeDrafts {
                 url: `/rest/api/3/workflowscheme/${parameters.id}/draft`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemeDrafts.getWorkflowSchemeDraft' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemeDrafts.getWorkflowSchemeDraft',
+            });
         });
     }
     updateWorkflowSchemeDraft(parameters, callback) {
@@ -49662,7 +51047,9 @@ class WorkflowSchemeDrafts {
                     updateDraftIfNeeded: parameters.updateDraftIfNeeded,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemeDrafts.updateWorkflowSchemeDraft' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemeDrafts.updateWorkflowSchemeDraft',
+            });
         });
     }
     deleteWorkflowSchemeDraft(parameters, callback) {
@@ -49671,7 +51058,9 @@ class WorkflowSchemeDrafts {
                 url: `/rest/api/3/workflowscheme/${parameters.id}/draft`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemeDrafts.deleteWorkflowSchemeDraft' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemeDrafts.deleteWorkflowSchemeDraft',
+            });
         });
     }
     getDraftDefaultWorkflow(parameters, callback) {
@@ -49680,7 +51069,9 @@ class WorkflowSchemeDrafts {
                 url: `/rest/api/3/workflowscheme/${parameters.id}/draft/default`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemeDrafts.getDraftDefaultWorkflow' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemeDrafts.getDraftDefaultWorkflow',
+            });
         });
     }
     updateDraftDefaultWorkflow(parameters, callback) {
@@ -49693,7 +51084,9 @@ class WorkflowSchemeDrafts {
                     updateDraftIfNeeded: parameters.updateDraftIfNeeded,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemeDrafts.updateDraftDefaultWorkflow' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemeDrafts.updateDraftDefaultWorkflow',
+            });
         });
     }
     deleteDraftDefaultWorkflow(parameters, callback) {
@@ -49702,7 +51095,9 @@ class WorkflowSchemeDrafts {
                 url: `/rest/api/3/workflowscheme/${parameters.id}/draft/default`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemeDrafts.deleteDraftDefaultWorkflow' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemeDrafts.deleteDraftDefaultWorkflow',
+            });
         });
     }
     getWorkflowSchemeDraftIssueType(parameters, callback) {
@@ -49711,7 +51106,9 @@ class WorkflowSchemeDrafts {
                 url: `/rest/api/3/workflowscheme/${parameters.id}/draft/issuetype/${parameters.issueType}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemeDrafts.getWorkflowSchemeDraftIssueType' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemeDrafts.getWorkflowSchemeDraftIssueType',
+            });
         });
     }
     setWorkflowSchemeDraftIssueType(parameters, callback) {
@@ -49721,7 +51118,9 @@ class WorkflowSchemeDrafts {
                 method: 'PUT',
                 data: parameters.body,
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemeDrafts.setWorkflowSchemeDraftIssueType' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemeDrafts.setWorkflowSchemeDraftIssueType',
+            });
         });
     }
     deleteWorkflowSchemeDraftIssueType(parameters, callback) {
@@ -49730,7 +51129,26 @@ class WorkflowSchemeDrafts {
                 url: `/rest/api/3/workflowscheme/${parameters.id}/draft/issuetype/${parameters.issueType}`,
                 method: 'DELETE',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemeDrafts.deleteWorkflowSchemeDraftIssueType' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemeDrafts.deleteWorkflowSchemeDraftIssueType',
+            });
+        });
+    }
+    publishDraftWorkflowScheme(parameters, callback) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const config = {
+                url: `/rest/api/3/workflowscheme/${parameters.id}/draft/publish`,
+                method: 'POST',
+                params: {
+                    validateOnly: parameters.validateOnly,
+                },
+                data: {
+                    statusMappings: parameters.statusMappings,
+                },
+            };
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemeDrafts.publishDraftWorkflowScheme',
+            });
         });
     }
     getDraftWorkflow(parameters, callback) {
@@ -49760,7 +51178,9 @@ class WorkflowSchemeDrafts {
                     updateDraftIfNeeded: parameters.updateDraftIfNeeded,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemeDrafts.updateDraftWorkflowMapping' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemeDrafts.updateDraftWorkflowMapping',
+            });
         });
     }
     deleteDraftWorkflowMapping(parameters, callback) {
@@ -49772,7 +51192,9 @@ class WorkflowSchemeDrafts {
                     workflowName: parameters.workflowName,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemeDrafts.deleteDraftWorkflowMapping' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemeDrafts.deleteDraftWorkflowMapping',
+            });
         });
     }
 }
@@ -49810,7 +51232,9 @@ class WorkflowSchemeProjectAssociations {
                     projectId: parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemeProjectAssociations.getWorkflowSchemeProjectAssociations' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemeProjectAssociations.getWorkflowSchemeProjectAssociations',
+            });
         });
     }
     associateSchemeWithProject(parameters, callback) {
@@ -49829,7 +51253,9 @@ class WorkflowSchemeProjectAssociations {
                     projectId: parameters === null || parameters === void 0 ? void 0 : parameters.projectId,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemeProjectAssociations.assignSchemeToProject' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemeProjectAssociations.assignSchemeToProject',
+            });
         });
     }
 }
@@ -49978,7 +51404,9 @@ class WorkflowSchemes {
                     returnDraftIfExists: parameters.returnDraftIfExists,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemes.getWorkflowSchemeIssueType' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemes.getWorkflowSchemeIssueType',
+            });
         });
     }
     setWorkflowSchemeIssueType(parameters, callback) {
@@ -49988,7 +51416,9 @@ class WorkflowSchemes {
                 method: 'PUT',
                 data: parameters.body,
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemes.setWorkflowSchemeIssueType' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemes.setWorkflowSchemeIssueType',
+            });
         });
     }
     deleteWorkflowSchemeIssueType(parameters, callback) {
@@ -50000,7 +51430,9 @@ class WorkflowSchemes {
                     updateDraftIfNeeded: parameters.updateDraftIfNeeded,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowSchemes.deleteWorkflowSchemeIssueType' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowSchemes.deleteWorkflowSchemeIssueType',
+            });
         });
     }
     getWorkflow(parameters, callback) {
@@ -50079,7 +51511,9 @@ class WorkflowStatusCategories {
                 url: '/rest/api/3/statuscategory',
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowStatusCategories.getStatusCategories' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowStatusCategories.getStatusCategories',
+            });
         });
     }
     getStatusCategory(parameters, callback) {
@@ -50088,7 +51522,9 @@ class WorkflowStatusCategories {
                 url: `/rest/api/3/statuscategory/${parameters.idOrKey}`,
                 method: 'GET',
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowStatusCategories.getStatusCategory' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowStatusCategories.getStatusCategory',
+            });
         });
     }
 }
@@ -50173,7 +51609,9 @@ class WorkflowTransitionProperties {
                     workflowMode: parameters.workflowMode,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowTransitionProperties.getWorkflowTransitionProperties' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowTransitionProperties.getWorkflowTransitionProperties',
+            });
         });
     }
     createWorkflowTransitionProperty(parameters, callback) {
@@ -50188,7 +51626,9 @@ class WorkflowTransitionProperties {
                 },
                 data: Object.assign(Object.assign({}, parameters), { transitionId: undefined, key: undefined, workflowName: undefined, workflowMode: undefined }),
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowTransitionProperties.createWorkflowTransitionProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowTransitionProperties.createWorkflowTransitionProperty',
+            });
         });
     }
     updateWorkflowTransitionProperty(parameters, callback) {
@@ -50203,7 +51643,9 @@ class WorkflowTransitionProperties {
                 },
                 data: Object.assign(Object.assign({}, parameters), { transitionId: undefined, key: undefined, workflowName: undefined, workflowMode: undefined }),
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowTransitionProperties.updateWorkflowTransitionProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowTransitionProperties.updateWorkflowTransitionProperty',
+            });
         });
     }
     deleteWorkflowTransitionProperty(parameters, callback) {
@@ -50217,7 +51659,9 @@ class WorkflowTransitionProperties {
                     workflowMode: parameters.workflowMode,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowTransitionProperties.deleteWorkflowTransitionProperty' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowTransitionProperties.deleteWorkflowTransitionProperty',
+            });
         });
     }
 }
@@ -50259,7 +51703,9 @@ class WorkflowTransitionRules {
                     expand: parameters.expand,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowTransitionRules.getWorkflowTransitionRuleConfigurations' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowTransitionRules.getWorkflowTransitionRuleConfigurations',
+            });
         });
     }
     updateWorkflowTransitionRuleConfigurations(parameters, callback) {
@@ -50271,7 +51717,9 @@ class WorkflowTransitionRules {
                     workflows: parameters === null || parameters === void 0 ? void 0 : parameters.workflows,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowTransitionRules.updateWorkflowTransitionRuleConfigurations' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowTransitionRules.updateWorkflowTransitionRuleConfigurations',
+            });
         });
     }
     deleteWorkflowTransitionRuleConfigurations(parameters, callback) {
@@ -50283,7 +51731,9 @@ class WorkflowTransitionRules {
                     workflows: parameters === null || parameters === void 0 ? void 0 : parameters.workflows,
                 },
             };
-            return this.client.sendRequest(config, callback, { methodName: 'version3.workflowTransitionRules.deleteWorkflowTransitionRuleConfigurations' });
+            return this.client.sendRequest(config, callback, {
+                methodName: 'version3.workflowTransitionRules.deleteWorkflowTransitionRuleConfigurations',
+            });
         });
     }
 }
@@ -72604,10 +74054,14 @@ var __createBinding;
         return r;
     };
 
-    __spreadArray = function (to, from) {
-        for (var i = 0, il = from.length, j = to.length; i < il; i++, j++)
-            to[j] = from[i];
-        return to;
+    __spreadArray = function (to, from, pack) {
+        if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+            if (ar || !(i in from)) {
+                if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+                ar[i] = from[i];
+            }
+        }
+        return to.concat(ar || from);
     };
 
     __await = function (v) {
