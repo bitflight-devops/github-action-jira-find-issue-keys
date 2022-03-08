@@ -1,81 +1,87 @@
-import * as fs from 'fs'
-import {readFileSync} from 'fs'
+import * as fs from 'fs';
+import { readFileSync } from 'fs';
 
 export function directoryExistsSync(path: string, required?: boolean): boolean {
   if (!path) {
-    throw new Error("Arg 'path' must not be empty")
+    throw new Error("Arg 'path' must not be empty");
   }
   try {
-    const stats: fs.Stats = fs.statSync(path)
+    const stats: fs.Stats = fs.statSync(path);
     if (stats.isDirectory()) {
-      return true
+      return true;
     } else if (!required) {
-      return false
+      return false;
     }
 
-    throw new Error(`Directory '${path}' does not exist`)
-  } catch (error) {
+    throw new Error(`Directory '${path}' does not exist`);
+  } catch (error: any) {
     if (error.code === 'ENOENT') {
       if (!required) {
-        return false
+        return false;
       }
 
-      throw new Error(`Directory '${path}' does not exist`)
+      throw new Error(`Directory '${path}' does not exist`);
     }
 
-    throw new Error(`Encountered an error when checking whether path '${path}' exists: ${error.message}`)
+    throw new Error(
+      `Encountered an error when checking whether path '${path}' exists: ${error.message}`,
+    );
   }
 }
 
 export function existsSync(path: string): boolean {
   if (!path) {
-    throw new Error("Arg 'path' must not be empty")
+    throw new Error("Arg 'path' must not be empty");
   }
 
   try {
-    fs.statSync(path)
-  } catch (error) {
+    fs.statSync(path);
+  } catch (error: any) {
     if (error.code === 'ENOENT') {
-      return false
+      return false;
     }
 
-    throw new Error(`Encountered an error when checking whether path '${path}' exists: ${error.message}`)
+    throw new Error(
+      `Encountered an error when checking whether path '${path}' exists: ${error.message}`,
+    );
   }
 
-  return true
+  return true;
 }
 
 export function fileExistsSync(path: string): boolean {
   if (!path) {
-    throw new Error("Arg 'path' must not be empty")
+    throw new Error("Arg 'path' must not be empty");
   }
 
   try {
-    const stats = fs.statSync(path)
+    const stats = fs.statSync(path);
     if (!stats.isDirectory()) {
-      return true
+      return true;
     }
 
-    return false
-  } catch (error) {
+    return false;
+  } catch (error: any) {
     if (error.code === 'ENOENT') {
-      return false
+      return false;
     }
 
-    throw new Error(`Encountered an error when checking whether path '${path}' exists: ${error.message}`)
+    throw new Error(
+      `Encountered an error when checking whether path '${path}' exists: ${error.message}`,
+    );
   }
 }
 
 export function loadFileSync(path: string): string {
   if (!path) {
-    throw new Error("Arg 'path' must not be empty")
+    throw new Error("Arg 'path' must not be empty");
   }
   try {
     if (fileExistsSync(path)) {
-      return readFileSync(path, 'utf8')
+      return readFileSync(path, 'utf8');
     }
-  } catch (error) {
-    throw new Error(`Encountered an error when reading file '${path}': ${error.message}`)
+  } catch (error: any) {
+    throw new Error(`Encountered an error when reading file '${path}': ${error.message}`);
   }
-  throw new Error(`Encountered an error when reading file '${path}': file not there`)
+  throw new Error(`Encountered an error when reading file '${path}': file not there`);
 }

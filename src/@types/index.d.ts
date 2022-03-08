@@ -1,33 +1,33 @@
 export interface JiraConfig {
-  baseUrl: string
-  token: string
-  email: string
-  transitionId?: string
-  project?: string
-  issuetype?: string
-  summary?: string
-  description?: string
-  issue?: string
+  baseUrl: string;
+  token: string;
+  email: string;
+  transitionId?: string;
+  project?: string;
+  issuetype?: string;
+  summary?: string;
+  description?: string;
+  issue?: string;
 }
 export interface Args {
-  token: string
-  string: string
-  headRef?: string
-  baseRef?: string
-  projects?: string
-  projectsIgnore?: string
-  includeMergeMessages: boolean
-  failOnError: boolean
-  config: JiraAuthConfig
+  token: string;
+  string: string;
+  headRef?: string;
+  baseRef?: string;
+  projects?: string;
+  projectsIgnore?: string;
+  includeMergeMessages: boolean;
+  failOnError: boolean;
+  config: JiraAuthConfig;
 }
 
 export interface JiraAuthConfig {
-  baseUrl: string
-  token: string
-  email: string
+  baseUrl: string;
+  token: string;
+  email: string;
 }
 
 export interface RefRange {
-  headRef: string
-  baseRef: string
+  headRef: string;
+  baseRef: string;
 }

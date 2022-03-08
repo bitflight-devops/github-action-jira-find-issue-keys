@@ -1,13 +1,13 @@
-import * as core from '@actions/core'
-import * as github from '@actions/github'
+import * as core from '@actions/core';
+import * as github from '@actions/github';
 
-import {Action} from './action'
-import {getInputs} from './input-helper'
+import { Action } from './action';
+import { getInputs } from './input-helper';
 
 async function exec(): Promise<void> {
-  await new Action(github.context, getInputs()).execute()
+  await new Action(github.context, getInputs()).execute();
 }
 
 exec().catch(error => {
-  core.setFailed(error)
-})
+  core.setFailed(error);
+});

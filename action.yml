@@ -74,5 +74,5 @@ outputs:
       A comma separated list of Jira Issues found in the input string
 
 runs:
-  using: 'node12'
+  using: 'node16'
   main: './dist/index.js'
