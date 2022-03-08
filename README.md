@@ -14,7 +14,7 @@ This action will find the issue keys in the GitHub event and return them as a co
 <!-- start usage -->
 
 ```yaml
-- uses: bitflight-devops/github-action-jira-find-issue-keys@v1.0.8
+- uses: bitflight-devops/github-action-jira-find-issue-keys@v1.0.9
   with:
     # The github token used for authenticating to GitHub
     token: ''
