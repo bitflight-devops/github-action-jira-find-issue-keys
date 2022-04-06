@@ -105,6 +105,7 @@ export default class EventManager {
   jira: Jira;
   refRange: RefRange;
   includeMergeMessages: boolean;
+  ignoreCommits: boolean;
   failOnError = false;
   listenForEvents: string[] = [];
   rawString: string;
@@ -114,6 +115,7 @@ export default class EventManager {
     this.context = context;
     this.failOnError = argv.failOnError;
     this.refRange = assignRefs(context, argv, octokit);
+    this.ignoreCommits = argv.ignoreCommits;
     this.includeMergeMessages = argv.includeMergeMessages;
     this.rawString = argv.string;
     this.filter = {
@@ -192,7 +194,8 @@ export default class EventManager {
     );
     if (
       !(this.refRange.baseRef && this.refRange.headRef) &&
-      !this.context.eventName.startsWith('pull_request')
+      !this.context.eventName.startsWith('pull_request') &&
+      !this.ignoreCommits
     ) {
       core.info('getJiraKeysFromGitRange: Base ref and head ref not found');
       return;
@@ -214,48 +217,49 @@ export default class EventManager {
     const refSet = this.getIssueSetFromString(this.refRange.headRef);
     core.setOutput('ref_issues', this.setToCommaDelimitedString(refSet));
 
-    // const dateRange = await this.getStartAndEndDates(this.refRange)
     const commitSet = new Set<string>();
     let after: string | null = null;
-    let hasNextPage = this.context.payload?.pull_request?.number ? true : false;
-    while (hasNextPage) {
-      const { repository } = await graphqlWithAuth<{ repository: Repository }>(
-        listCommitMessagesInPullRequest,
-        {
-          owner: this.context.repo.owner,
-          repo: this.context.repo.repo,
-          prNumber: this.context.payload?.pull_request?.number,
-          after,
-        },
-      );
-      if ((repository?.pullRequest?.commits?.totalCount as number) == 0) {
-        hasNextPage = false;
-      } else {
-        hasNextPage = repository?.pullRequest?.commits?.pageInfo.hasNextPage as boolean;
-        after = repository?.pullRequest?.commits?.pageInfo.endCursor as string | null;
-        if (repository?.pullRequest?.commits?.nodes) {
-          for (const node of repository.pullRequest.commits.nodes) {
-            if (node) {
-              let skipCommit = false;
-              if (
-                node.commit.message.startsWith('Merge branch') ||
-                node.commit.message.startsWith('Merge pull')
-              ) {
-                core.debug('Commit message indicates that it is a merge');
-                if (!this.includeMergeMessages) {
-                  skipCommit = true;
+    if (this.ignoreCommits == false) {
+      let hasNextPage = this.context.payload?.pull_request?.number ? true : false;
+      while (hasNextPage) {
+        const { repository } = await graphqlWithAuth<{ repository: Repository }>(
+          listCommitMessagesInPullRequest,
+          {
+            owner: this.context.repo.owner,
+            repo: this.context.repo.repo,
+            prNumber: this.context.payload?.pull_request?.number,
+            after,
+          },
+        );
+        if ((repository?.pullRequest?.commits?.totalCount as number) == 0) {
+          hasNextPage = false;
+        } else {
+          hasNextPage = repository?.pullRequest?.commits?.pageInfo.hasNextPage as boolean;
+          after = repository?.pullRequest?.commits?.pageInfo.endCursor as string | null;
+          if (repository?.pullRequest?.commits?.nodes) {
+            for (const node of repository.pullRequest.commits.nodes) {
+              if (node) {
+                let skipCommit = false;
+                if (
+                  node.commit.message.startsWith('Merge branch') ||
+                  node.commit.message.startsWith('Merge pull')
+                ) {
+                  core.debug('Commit message indicates that it is a merge');
+                  if (!this.includeMergeMessages) {
+                    skipCommit = true;
+                  }
                 }
-              }
-              if (skipCommit === false) {
-                this.getIssueSetFromString(node.commit.message, commitSet);
+                if (skipCommit === false) {
+                  this.getIssueSetFromString(node.commit.message, commitSet);
+                }
               }
             }
           }
         }
       }
-    }
 
-    core.setOutput('commit_issues', this.setToCommaDelimitedString(commitSet));
+      core.setOutput('commit_issues', this.setToCommaDelimitedString(commitSet));
+    }
 
     const combinedSet = new Set<string>([...stringSet, ...titleSet, ...refSet, ...commitSet]);
 

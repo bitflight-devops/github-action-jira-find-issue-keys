@@ -17,6 +17,7 @@ export interface Args {
   projects?: string;
   projectsIgnore?: string;
   includeMergeMessages: boolean;
+  ignoreCommits: boolean;
   failOnError: boolean;
   config: JiraAuthConfig;
 }

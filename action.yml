@@ -37,6 +37,11 @@ inputs:
     description: >
       The Git Base Ref to which commit messages will be collected up from.
     required: false
+  ignore_commits:
+    description: >
+      Should the commit messages be ignored when looking for issues
+    required: false
+    default: 'false'
   jira_base_url:
     description: >
       The Jira cloud base url including protocol i.e. 'https://company.atlassian.net'

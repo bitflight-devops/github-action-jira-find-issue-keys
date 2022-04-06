@@ -132,10 +132,6 @@
     "typescript-eslint-language-service": "^5.0.0",
     "yarn-or-npm": "^3.0.1"
   },
-  "jest": {
-    "testPathIgnorePatterns": ["/helpers/", "/node_modules/"],
-    "coveragePathIgnorePatterns": ["/node_modules/"]
-  },
   "jest-junit": {
     "suiteNameTemplate": "{filepath}",
     "classNameTemplate": "{classname}",

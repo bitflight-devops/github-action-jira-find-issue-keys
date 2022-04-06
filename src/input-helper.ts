@@ -30,6 +30,7 @@ export function getInputs(): Args {
   result.projects = core.getInput('projects');
   result.projectsIgnore = core.getInput('projects_ignore');
   result.includeMergeMessages = core.getBooleanInput('include_merge_messages');
+  result.ignoreCommits = core.getBooleanInput('ignore_commits');
   result.failOnError = core.getInput('fail_on_error') === 'true';
 
   // GitHub workspace
