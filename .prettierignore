@@ -6,3 +6,19 @@ node_modules/
 
 # Ignore CHANGELOG.md files to avoid issues with automated release job
 CHANGELOG.md
+
+dist/
+lib/
+node_modules/
+dist*/
+.*rc
+.*rc.yaml
+.*rc.yml
+.*rc.json
+.*rc.js
+package-lock.json
+**/*inline-template-*.component.html
+.husky/
+.trunk/
+.vscode/
+elements/

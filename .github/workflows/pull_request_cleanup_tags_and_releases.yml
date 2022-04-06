@@ -7,21 +7,35 @@ on:
   workflow_dispatch:
     inputs:
       regex:
-        description: 'Regex to search by'
+        description: "Regex to search by"
         required: false
       pr_number:
-        description: 'PR Number to search by'
+        description: "PR Number to search by"
         required: false
 
+concurrency:
+  group: ${{ github.workflow }}${{ github.event_name }}${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  cleanup:
     name: Cleanup Tags and Releases
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Remove unused releases and tags
         uses: Broadshield/github-action-cleanup-releases-and-tags@main
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
         with:
           regex: ${{ github.event.inputs.regex }}
           pr_number: ${{ github.event.inputs.pr_number }}
+
+      - name: Delete workflow runs
+        uses: MajorScruffy/delete-workflow-runs@v0.1.0
+        id: delete-workflow-runs
+        with:
+          what-if: 'false'
+          repository: ${{ github.repository }}
+          older-than-seconds: 604800           # remove all workflow runs older than 7 days
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}

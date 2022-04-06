@@ -1,13 +1,44 @@
 name: Code Linting
 on: [pull_request]
+
+concurrency:
+  group: ${{ github.workflow }}${{ github.event_name }}${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 jobs:
   eslint:
     name: runner / eslint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - name: eslint
-        uses: reviewdog/action-eslint@v1
+      - uses: actions/checkout@v3
         with:
-          reporter: github-pr-review # Change reporter.
-          # eslint_flags: 'src/'
+          ref: ${{github.head_ref || github.ref}}
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "16"
+          cache: "npm"
+      - name: Git Account Setup
+        run: |
+          git config --global user.email "{{ github.actor }}@users.noreply.github.com"
+          git config --global user.name "{{ github.actor }}"
+      - name: Install Packages
+        run: |
+          npm install
+      - name: eslint fix
+        id: fix
+        continue-on-error: true
+        run: |
+          npm run lint:ts
+
+      - name: Commit Fixes
+        run: |
+          if [[ -n $(git status -s) ]]; then
+            git add .
+            git commit -m "Auto-fixed linting errors - remember to run 'npm run lint:ts' before committing"
+            git push
+          fi
+
+      - uses: reviewdog/action-eslint@v1
+        with:
+          reporter: github-pr-review
+          eslint_flags: "--ext .js,.ts ."
