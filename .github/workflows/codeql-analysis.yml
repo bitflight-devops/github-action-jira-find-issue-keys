@@ -1,4 +1,4 @@
-name: "CodeQL"
+name: 'CodeQL'
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
       - '*.js'
 
   schedule:
-    - cron: "45 22 * * 6"
+    - cron: '45 22 * * 6'
 
 jobs:
   analyze:

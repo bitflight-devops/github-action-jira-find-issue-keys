@@ -119,11 +119,11 @@ export default class EventManager {
     this.filter = {
       projectsIncluded:
         argv.projects && argv.projects != ''
-          ? argv.projects.split(',').map(i => i.trim().toUpperCase())
+          ? argv.projects.split(',').map((i) => i.trim().toUpperCase())
           : undefined,
       projectsExcluded:
         argv.projectsIgnore && argv.projectsIgnore != ''
-          ? argv.projectsIgnore.split(',').map(i => i.trim().toUpperCase())
+          ? argv.projectsIgnore.split(',').map((i) => i.trim().toUpperCase())
           : undefined,
     };
   }

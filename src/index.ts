@@ -8,6 +8,6 @@ async function exec(): Promise<void> {
   await new Action(github.context, getInputs()).execute();
 }
 
-exec().catch(error => {
+exec().catch((error) => {
   core.setFailed(error);
 });
