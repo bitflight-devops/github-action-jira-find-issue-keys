@@ -14,7 +14,7 @@ This action will find the issue keys in the GitHub event and return them as a co
 <!-- start usage -->
 
 ```yaml
-- uses: bitflight-devops/github-action-jira-find-issue-keys@v1.0.9
+- uses: bitflight-devops/github-action-jira-find-issue-keys@v1.0.10
   with:
     # The github token used for authenticating to GitHub
     token: ''
@@ -80,7 +80,7 @@ This action will find the issue keys in the GitHub event and return them as a co
 | **`include_merge_messages`** | When parsing commit messages, include merge and pull messages. This is disabled by default, to exclude tickets that may be included or fixed in other branches or pull requests.          |   `false`   |  **false**   |
 | **`head_ref`**               | The Git Head Ref to which commit messages will be collected up to. If the base_ref is included, and the github event is a pull_request or push, The head_ref from the event will be used. |             |  **false**   |
 | **`base_ref`**               | The Git Base Ref to which commit messages will be collected up from.                                                                                                                      |             |  **false**   |
-| **`ignore_commits`**         | Should the commit messages be ignored when looking for issues                                                                                                                             |   `false`   |  **false**   |
+| **`ignore_commits`**         | Should the commit messages be ignored when looking for issues                                                                                                                             |             |  **false**   |
 | **`jira_base_url`**          | The Jira cloud base url including protocol i.e. 'https://company.atlassian.net' or use environment variable JIRA_BASE_URL                                                                 |             |  **false**   |
 | **`jira_user_email`**        | The Jira cloud user email address or use environment variable JIRA_USER_EMAIL                                                                                                             |             |  **false**   |
 | **`jira_api_token`**         | The Jira cloud user api token or use environment variable JIRA_API_TOKEN                                                                                                                  |             |  **false**   |
