@@ -71,6 +71,7 @@ describe('jira ticket transition', () => {
     inputs.string = 'DVPS-336';
     inputs.token = process.env.GITHUB_TOKEN;
     inputs.include_merge_messages = 'true';
+    inputs.ignore_commits = 'false';
     inputs.fail_on_error = 'false';
 
     inputs.jira_base_url = baseUrl;
