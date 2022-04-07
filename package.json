@@ -1,6 +1,6 @@
 {
   "name": "@bitflight-devops/github-action-jira-find-issue-keys",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "root": true,
   "description": "This action will find the issue keys in the GitHub event and return them as a comma separated list",
   "main": "dist/index.js",
@@ -12,7 +12,13 @@
   "bugs": {
     "url": "https://github.com/bitflight-devops/github-action-jira-find-issue-keys/issues"
   },
-  "keywords": ["actions", "github", "node12", "jira", "tickets"],
+  "keywords": [
+    "actions",
+    "github",
+    "node12",
+    "jira",
+    "tickets"
+  ],
   "author": "Jamie Nelson <jamie@bitflight.io>",
   "license": "MIT",
   "private": true,
@@ -47,13 +53,25 @@
     }
   },
   "commitlint": {
-    "extends": ["@commitlint/config-conventional"],
+    "extends": [
+      "@commitlint/config-conventional"
+    ],
     "rules": {
-      "body-max-length": [0],
-      "body-max-line-length": [0],
-      "footer-max-length": [0],
-      "footer-max-line-length": [0],
-      "header-max-length": [0]
+      "body-max-length": [
+        0
+      ],
+      "body-max-line-length": [
+        0
+      ],
+      "footer-max-length": [
+        0
+      ],
+      "footer-max-line-length": [
+        0
+      ],
+      "header-max-length": [
+        0
+      ]
     }
   },
   "engines": {
@@ -66,7 +84,10 @@
     },
     "./package.json": "./package.json"
   },
-  "files": ["src", "dist"],
+  "files": [
+    "src",
+    "dist"
+  ],
   "dependencies": {
     "@actions/core": "^1.6.0",
     "@actions/github": "^5.0.1",
@@ -139,6 +160,8 @@
   },
   "lint-staged": {
     "{src,__tests__}/**/*.js": "eslint --cache --fix",
-    "*.ts": ["eslint --cache --fix"]
+    "*.ts": [
+      "eslint --cache --fix"
+    ]
   }
 }
