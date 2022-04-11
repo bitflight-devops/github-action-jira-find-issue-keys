@@ -12,13 +12,7 @@
   "bugs": {
     "url": "https://github.com/bitflight-devops/github-action-jira-find-issue-keys/issues"
   },
-  "keywords": [
-    "actions",
-    "github",
-    "node12",
-    "jira",
-    "tickets"
-  ],
+  "keywords": ["actions", "github", "node16", "jira", "tickets"],
   "author": "Jamie Nelson <jamie@bitflight.io>",
   "license": "MIT",
   "private": true,
@@ -42,7 +36,7 @@
     "pre-push": "yarn format",
     "preversion": "echo 'Running test';yon test",
     "version": "echo 'Run versioning commands';yon generate-docs;echo \"::set-output name=tag::v${npm_package_version}\"",
-    "postversion": "echo 'Running post versioning commands';git push --tags -f && git push && echo \"Successfully released version $npm_package_version!\"",
+    "postversion": "echo 'Running post versioning commands';git add . && git commit -m 'update package version' && git push --tags -f && git push && echo \"Successfully released version $npm_package_version!\"",
     "generate-docs": "github-action-readme-generator && prettier --write .ghadocs.json README.md && git add .ghadocs.json README.md",
     "prepare": "husky install;git config --global rebase.autosquash true",
     "codegen": "graphql-codegen --config codegen.yml"
@@ -53,29 +47,17 @@
     }
   },
   "commitlint": {
-    "extends": [
-      "@commitlint/config-conventional"
-    ],
+    "extends": ["@commitlint/config-conventional"],
     "rules": {
-      "body-max-length": [
-        0
-      ],
-      "body-max-line-length": [
-        0
-      ],
-      "footer-max-length": [
-        0
-      ],
-      "footer-max-line-length": [
-        0
-      ],
-      "header-max-length": [
-        0
-      ]
+      "body-max-length": [0],
+      "body-max-line-length": [0],
+      "footer-max-length": [0],
+      "footer-max-line-length": [0],
+      "header-max-length": [0]
     }
   },
   "engines": {
-    "node": "^10.12.0 || >=12.0.0"
+    "node": ">=16.0.0"
   },
   "exports": {
     ".": {
@@ -84,10 +66,7 @@
     },
     "./package.json": "./package.json"
   },
-  "files": [
-    "src",
-    "dist"
-  ],
+  "files": ["src", "dist"],
   "dependencies": {
     "@actions/core": "^1.6.0",
     "@actions/github": "^5.0.1",
@@ -133,7 +112,7 @@
     "eslint-plugin-prettier": "^4.0.0",
     "eslint-plugin-security": "^1.4.0",
     "eslint-plugin-simple-import-sort": "^7.0.0",
-    "github-action-readme-generator": "1.0.12",
+    "github-action-readme-generator": "^1.0.13",
     "husky": "^7.0.4",
     "jest": "^27.5.1",
     "jest-circus": "^27.5.1",
@@ -160,8 +139,6 @@
   },
   "lint-staged": {
     "{src,__tests__}/**/*.js": "eslint --cache --fix",
-    "*.ts": [
-      "eslint --cache --fix"
-    ]
+    "*.ts": ["eslint --cache --fix"]
   }
 }
