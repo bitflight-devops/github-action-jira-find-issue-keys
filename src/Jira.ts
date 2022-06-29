@@ -40,15 +40,14 @@ export default class Jira {
       params.fields = query.fields || [];
       params.expand = query.expand || undefined;
     }
-
-    return await this.client.issues.getIssue(params);
+    return this.client.issues.getIssue(params);
   }
 
   async getIssueTransitions(issueId: string): Promise<Transitions> {
     const params: GetTransitions = {
       issueIdOrKey: issueId,
     };
-    return await this.client.issues.getTransitions(params);
+    return this.client.issues.getTransitions(params);
   }
 
   async transitionIssue(issueId: string, data: IssueTransition): Promise<object> {
@@ -56,6 +55,6 @@ export default class Jira {
       issueIdOrKey: issueId,
       transition: data,
     };
-    return await this.client.issues.doTransition(params);
+    return this.client.issues.doTransition(params);
   }
 }

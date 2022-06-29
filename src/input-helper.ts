@@ -9,7 +9,7 @@ export function getInputs(): Args {
   const result = obj as Args;
   const jiraConfig = obj as JiraAuthConfig;
 
-  jiraConfig.baseUrl = process.env.JIRA_BASE_URL || core.getInput('jira_base_url') || '';
+  jiraConfig.baseUrl = process.env.JIRA_BASE_URL || core.getInput('jira_base_url');
   if (!jiraConfig.baseUrl || jiraConfig.baseUrl === '') {
     throw new Error('JIRA_BASE_URL env not defined, or supplied as action input jira_base_url');
   }
@@ -23,7 +23,8 @@ export function getInputs(): Args {
   }
 
   result.config = jiraConfig;
-  result.token = core.getInput('token') || process.env.GITHUB_TOKEN || '';
+  result.githubApiBaseUrl = core.getInput('github-api-url') || process.env.GITHUB_API_URL || undefined;
+  result.token = core.getInput('token') || core.getInput('github-token') || process.env.GITHUB_TOKEN || 'NO_TOKEN';
   result.string = core.getInput('string');
   result.baseRef = core.getInput('base_ref');
   result.headRef = core.getInput('head_ref');
@@ -31,7 +32,7 @@ export function getInputs(): Args {
   result.projectsIgnore = core.getInput('projects_ignore');
   result.includeMergeMessages = core.getBooleanInput('include_merge_messages');
   result.ignoreCommits = core.getBooleanInput('ignore_commits');
-  result.failOnError = core.getInput('fail_on_error') === 'true';
+  result.failOnError = core.getBooleanInput('fail_on_error');
 
   // GitHub workspace
   let githubWorkspacePath = process.env.GITHUB_WORKSPACE;

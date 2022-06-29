@@ -5,25 +5,59 @@
   },
   "editor.formatOnSave": true,
   "eslint.alwaysShowStatus": true,
+  "[json]": {
+    "editor.defaultFormatter": "Trunk.io"
+  },
   "eslint.validate": [
     "javascript",
-    "typescript"
+    "typescript",
+    "javascriptreact",
+    "typescriptreact",
+    "html"
   ],
-  "[json]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  "eslint.options": {
+    "extensions": [
+      ".js",
+      ".ts",
+      "html"
+    ]
   },
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
-  },
-  "[ts]": {
-    "editor.codeActionsOnSave": {
-      "source.fixAll.eslint": true
-    }
+    "source.fixAll.eslint": true,
   },
   "[typescript]": {
-    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
     "editor.codeActionsOnSave": {
       "source.fixAll.eslint": true
     }
-  }
+  },
+  "yaml.customTags": [
+    "!Equals sequence",
+    "!FindInMap sequence",
+    "!GetAtt",
+    "!GetAZs",
+    "!ImportValue",
+    "!Join sequence",
+    "!Ref",
+    "!Select sequence",
+    "!Split sequence",
+    "!Sub",
+    "!And",
+    "!And sequence",
+    "!If",
+    "!If sequence",
+    "!Not",
+    "!Not sequence",
+    "!Equals",
+    "!Or",
+    "!Or sequence",
+    "!FindInMap",
+    "!Base64",
+    "!Join",
+    "!Cidr",
+    "!Sub sequence",
+    "!ImportValue sequence",
+    "!Select",
+    "!Split"
+  ],
+  "jest.jestCommandLine": "yarn run test"
 }

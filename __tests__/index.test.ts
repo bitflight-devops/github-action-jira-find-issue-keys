@@ -1,4 +1,3 @@
-/* eslint-disable security/detect-object-injection */
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import * as path from 'path';
@@ -58,9 +57,7 @@ describe('jira ticket transition', () => {
     github.context.sha = '1234567890123456789012345678901234567890';
 
     // Mock ./fs-helper directoryExistsSync()
-    jest
-      .spyOn(fsHelper, 'directoryExistsSync')
-      .mockImplementation((fspath: string) => fspath === gitHubWorkspace);
+    jest.spyOn(fsHelper, 'directoryExistsSync').mockImplementation((fspath: string) => fspath === gitHubWorkspace);
 
     // GitHub workspace
     process.env.GITHUB_WORKSPACE = gitHubWorkspace;

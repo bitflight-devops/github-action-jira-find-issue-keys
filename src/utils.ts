@@ -3,11 +3,9 @@ import { GitHub } from '@actions/github/lib/utils';
 
 import type { Args, RefRange } from './@types';
 
+export type GithubOctokitType = InstanceType<typeof GitHub>;
 export const issueIdRegEx = /([a-zA-Z0-9]+-[0-9]+)/g;
-export async function getPreviousReleaseRef(
-  octo: InstanceType<typeof GitHub>,
-  _context: Context,
-): Promise<string | null> {
+export async function getPreviousReleaseRef(octo: GithubOctokitType, _context: Context): Promise<string | null> {
   if (!_context.repo || !octo) {
     return null;
   }
@@ -19,11 +17,7 @@ export async function getPreviousReleaseRef(
 
   return tag_name;
 }
-export function assignRefs(
-  _context: Context,
-  _argv: Args,
-  octokit: InstanceType<typeof GitHub>,
-): RefRange {
+export function assignRefs(_context: Context, _argv: Args, octokit: GithubOctokitType): RefRange {
   let headRef, baseRef;
 
   if (_context.eventName.startsWith('pull_request') && _context.payload.pull_request) {

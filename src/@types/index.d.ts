@@ -20,6 +20,7 @@ export interface Args {
   ignoreCommits: boolean;
   failOnError: boolean;
   config: JiraAuthConfig;
+  githubApiBaseUrl?: string;
 }
 
 export interface JiraAuthConfig {
@@ -31,4 +32,9 @@ export interface JiraAuthConfig {
 export interface RefRange {
   headRef: string;
   baseRef: string;
+}
+
+export interface ProjectFilter {
+  projectsIncluded?: string[];
+  projectsExcluded?: string[];
 }

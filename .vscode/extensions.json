@@ -1,0 +1,27 @@
+{
+    "recommendations": [
+        "ghmcadams.lintlens",
+        "dbaeumer.vscode-eslint",
+        "mgmcdermott.vscode-language-babel",
+        "adpyke.codesnap",
+        "editorconfig.editorconfig",
+        "mhutchie.git-graph",
+        "omartawfik.github-actions-vscode",
+        "github.copilot",
+        "eamodio.gitlens",
+        "wix.vscode-import-cost",
+        "orta.vscode-jest",
+        "bierner.markdown-preview-github-styles",
+        "pkief.material-icon-theme",
+        "christian-kohler.path-intellisense",
+        "mrmlnc.vscode-remark",
+        "foxundermoon.shell-format",
+        "sonarsource.sonarlint-vscode",
+        "trunk.io",
+        "pflannery.vscode-versionlens",
+        "redhat.vscode-yaml",
+        "eg2.vscode-npm-script",
+        "christian-kohler.npm-intellisense",
+        "yzhang.markdown-all-in-one"
+    ]
+}

@@ -16,25 +16,25 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '16'
-          cache: 'npm'
+          cache: 'yarn'
       - name: Git Account Setup
         run: |
           git config --global user.email "{{ github.actor }}@users.noreply.github.com"
           git config --global user.name "{{ github.actor }}"
       - name: Install Packages
         run: |
-          npm install
+          yarn install
       - name: eslint fix
         id: fix
         continue-on-error: true
         run: |
-          npm run lint:ts
+          yarn run lint:fix
 
       - name: Commit Fixes
         run: |
           if [[ -n $(git status -s) ]]; then
             git add .
-            git commit -m "Auto-fixed linting errors - remember to run 'npm run lint:ts' before committing"
+            git commit -m "chore(lint): auto-fixed linting errors - remember to run 'npm run lint:fix' before committing"
             git push
           fi
 
