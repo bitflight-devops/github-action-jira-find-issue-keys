@@ -24,7 +24,8 @@
   "private": true,
   "scripts": {
     "all": "yarn run build && yarn run format && yarn run lint && yarn run package && yarn run test",
-    "build": "node .github/scripts/esbuild.cjs",
+    "build:script": "node .github/scripts/esbuild.cjs",
+    "build": "yarn exec esbuild src/index.ts --bundle --outdir=lib/ --platform=node --target=node16.10 --sourcemap --format=cjs",
     "clean": "yarn exec rimraf lib",
     "codegen": "yarn exec graphql-codegen --config codegen.yml",
     "commit": "yarn exec git-cz",
