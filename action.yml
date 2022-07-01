@@ -7,6 +7,12 @@ inputs:
   token:
     description: The github token used for authenticating to GitHub
     required: true
+  from:
+    description: >
+      Find from predefined place.
+      Can be 'branch', 'pull_request', 'string', or 'commits', default is 'commits'
+    required: false
+    default: commits
   string:
     description: A string to search for issues
     required: false

@@ -29,7 +29,7 @@ jobs:
         uses: ./github-action-jira-find-issue-keys
         with:
           jira_base_url: ${{ secrets.JIRA_BASE_URL }}
-          github-token: ${{github.token}}
+          token: ${{github.token}}
           from: string
           string: DVPS-342 | will search in branch name
 
