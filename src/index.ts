@@ -1,13 +1,32 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
+import { err, Result } from 'neverthrow';
 
-import { Action } from './action';
-import { getInputs } from './input-helper';
+import Action from './action';
+import ActionError from './action-error';
+import inputHelper from './input-helper';
 
-async function exec(): Promise<void> {
-  await new Action(github.context, getInputs()).execute();
+async function exec(): Promise<Result<boolean, ActionError>> {
+  let actionInstance: Action;
+  try {
+    actionInstance = new Action(github.context, inputHelper());
+  } catch (error) {
+    if (error instanceof ActionError) {
+      return err(error);
+    }
+    return err(new ActionError(`index:exec: Failed to construct actionInstance:`, error));
+  }
+  return actionInstance.execute();
 }
 
-exec().catch((error) => {
-  core.setFailed(error);
+exec().then((actionResult) => {
+  actionResult.match(
+    (success) => core.info(`Action completed successfully [${success}]`),
+    (error) => {
+      error.logError();
+      if (Action.failOnError) {
+        core.setFailed('Failed to complete the action');
+      }
+    },
+  );
 });

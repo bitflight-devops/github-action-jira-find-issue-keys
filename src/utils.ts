@@ -1,41 +1,83 @@
-import { Context } from '@actions/github/lib/context';
-import { GitHub } from '@actions/github/lib/utils';
+import * as core from '@actions/core';
+import { Octokit } from '@octokit/rest';
+import type {
+  PullRequestEvent,
+  PullRequestReviewCommentEvent,
+  PullRequestReviewEvent,
+  PushEvent,
+} from '@octokit/webhooks-definitions/schema';
 
-import type { Args, RefRange } from './@types';
+import ActionError from './action-error';
+import type { Arguments, ReferenceRange } from './types';
+import type { Context, GithubOctokitType } from './types/complex-types';
 
-export const issueIdRegEx = /([a-zA-Z0-9]+-[0-9]+)/g;
-export async function getPreviousReleaseRef(
-  octo: InstanceType<typeof GitHub>,
-  _context: Context,
-): Promise<string | null> {
-  if (!_context.repo || !octo) {
-    return null;
+export const issueIdRegEx = /([\dA-Za-z]+-\d+)/g;
+export function undefinedOnEmpty(value?: string): string | undefined {
+  if (!value || value.trim() === '') {
+    return undefined;
   }
-  const releases = await octo.rest.repos.getLatestRelease({
-    ..._context.repo,
-  });
-
-  const { tag_name } = releases.data;
-
-  return tag_name;
+  return value;
 }
-export function assignRefs(
-  _context: Context,
-  _argv: Args,
-  octokit: InstanceType<typeof GitHub>,
-): RefRange {
-  let headRef, baseRef;
-
-  if (_context.eventName.startsWith('pull_request') && _context.payload.pull_request) {
-    headRef = headRef || _context.payload?.pull_request?.head?.ref || null;
-    baseRef = baseRef || _context.payload?.pull_request?.base?.ref || null;
-  } else if (_context.eventName === 'push') {
-    if (_context.ref?.startsWith('refs/tags')) {
-      baseRef = baseRef || getPreviousReleaseRef(octokit, _context);
-    }
-    headRef = headRef || _context.ref || null;
+export async function getPreviousReleaseReference(
+  octo: GithubOctokitType,
+  githubContext: Context,
+): Promise<string | undefined> {
+  if (githubContext && octo) {
+    const releases = await (octo as Octokit).rest.repos.getLatestRelease({
+      ...githubContext.repo,
+    });
+    return releases?.data?.tag_name;
   }
-  headRef = _argv.headRef || headRef || _context.ref || null;
-  baseRef = _argv.baseRef || baseRef || _context.ref || null;
-  return { headRef, baseRef };
+  return undefined;
+}
+export async function assignReferences(
+  githubContext: Context,
+  providedArguments: Arguments,
+  octokit: GithubOctokitType,
+): Promise<ReferenceRange> {
+  let headReference: string | undefined;
+  let baseReference: string | undefined;
+  const { eventName, payload } = githubContext;
+  if (!githubContext) {
+    throw new ActionError('Context is required');
+  }
+  let recievedPayload:
+    | PushEvent
+    | PullRequestEvent
+    | PullRequestReviewEvent
+    | PullRequestReviewCommentEvent
+    | undefined;
+  switch (eventName) {
+    case 'pull_request':
+      recievedPayload = payload as PullRequestEvent;
+      break;
+    case 'pull_request_review':
+      recievedPayload = payload as PullRequestReviewEvent;
+      break;
+    case 'pull_request_review_comment':
+      recievedPayload = payload as PullRequestReviewCommentEvent;
+      break;
+    case 'push':
+      recievedPayload = payload as PushEvent;
+      break;
+    default:
+      core.warning(`Unhandled event type: ${eventName}`);
+      recievedPayload = undefined;
+      break;
+  }
+  if (recievedPayload) {
+    if ('pull_request' in recievedPayload) {
+      headReference = recievedPayload.pull_request.head.ref;
+      baseReference = recievedPayload.pull_request.base.ref;
+    } else if ('ref' in recievedPayload) {
+      headReference = recievedPayload.ref;
+      baseReference = await getPreviousReleaseReference(octokit, githubContext);
+    }
+  }
+  headReference = providedArguments.headRef || headReference;
+  baseReference = providedArguments.baseRef || baseReference || headReference;
+  if (!headReference || !baseReference) {
+    throw new ActionError('Head or base reference is missing, and it cannot be determined from the event');
+  }
+  return { headRef: headReference, baseRef: baseReference };
 }

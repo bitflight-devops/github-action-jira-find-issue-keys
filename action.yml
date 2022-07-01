@@ -7,6 +7,12 @@ inputs:
   token:
     description: The github token used for authenticating to GitHub
     required: true
+  from:
+    description: >
+      Find from predefined place.
+      Can be 'branch', 'pull_request', 'string', or 'commits', default is 'commits'
+    required: false
+    default: commits
   string:
     description: A string to search for issues
     required: false
@@ -42,6 +48,18 @@ inputs:
       Should the commit messages be ignored when looking for issues
     required: false
     default: false
+  github_api_url:
+    description: >
+      The URL of the GitHub API to use.
+      This allows those with GitHub Enterprise to use the GitHub Enterprise API.
+    required: false
+  github_enterprise_server_version:
+    description: >
+      The version of the GitHub Enterprise Server to use.
+      This allows those with GitHub Enterprise to use the GitHub Enterprise API.
+      Available versions to use: 3.2, 3.3, 3.4, 3.5
+    required: false
+    default: '3.5'
   jira_base_url:
     description: >
       The Jira cloud base url including protocol i.e. 'https://company.atlassian.net'
@@ -80,4 +98,4 @@ outputs:
 
 runs:
   using: 'node16'
-  main: './dist/index.cjs'
+  main: './lib/index.js'

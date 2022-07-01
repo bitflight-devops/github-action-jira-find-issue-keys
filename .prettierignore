@@ -16,7 +16,7 @@ dist*/
 .*rc.yml
 .*rc.json
 .*rc.js
-package-lock.json
+*.json
 **/*inline-template-*.component.html
 .husky/
 .trunk/

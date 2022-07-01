@@ -1,29 +1,71 @@
 {
+  "editor.rulers": [
+    120
+  ],
   "eslint.packageManager": "yarn",
   "eslint.codeAction.showDocumentation": {
     "enable": true
   },
   "editor.formatOnSave": true,
-  "eslint.alwaysShowStatus": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "files.associations": {
+    "*.shot": "jest-snapshot"
+  },
+  "vsicons.associations.files": [
+    {
+      "icon": "jest_snapshot",
+      "extensions": [
+        ".shot",
+      ],
+      "extends": "jest_snapshot"
+    },
+  ],
   "eslint.validate": [
     "javascript",
-    "typescript"
+    "typescript",
+    "javascriptreact",
+    "typescriptreact",
+    "html"
   ],
+  "eslint.options": {
+    "extensions": [
+      ".js",
+      ".ts",
+      "html"
+    ]
+  },
+
+  "yaml.customTags": [
+    "!Equals sequence",
+    "!FindInMap sequence",
+    "!GetAtt",
+    "!GetAZs",
+    "!ImportValue",
+    "!Join sequence",
+    "!Ref",
+    "!Select sequence",
+    "!Split sequence",
+    "!Sub",
+    "!And",
+    "!And sequence",
+    "!If",
+    "!If sequence",
+    "!Not",
+    "!Not sequence",
+    "!Equals",
+    "!Or",
+    "!Or sequence",
+    "!FindInMap",
+    "!Base64",
+    "!Join",
+    "!Cidr",
+    "!Sub sequence",
+    "!ImportValue sequence",
+    "!Select",
+    "!Split"
+  ],
+  "jest.jestCommandLine": "node_modules/jest/bin/jest.js --runInBand --no-cache --no-coverage",
   "[json]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
-  },
-  "[ts]": {
-    "editor.codeActionsOnSave": {
-      "source.fixAll.eslint": true
-    }
-  },
-  "[typescript]": {
-    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
-    "editor.codeActionsOnSave": {
-      "source.fixAll.eslint": true
-    }
+    "editor.defaultFormatter": "vscode.json-language-features"
   }
 }
