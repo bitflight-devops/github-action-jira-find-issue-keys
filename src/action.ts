@@ -1,36 +1,32 @@
-import * as core from '@actions/core';
-import { Context } from '@actions/github/lib/context';
+import { Result } from 'neverthrow';
 
-import { Args, JiraConfig } from './@types/';
-import EventManager from './EventManager';
+import ActionError from './action-error';
+import EventManager from './event-manager';
 import Jira from './Jira';
+import type { Arguments } from './types';
+import type { Context } from './types/complex-types';
 
-export class Action {
-  jira: Jira;
-  config: JiraConfig;
-  argv: Args;
-  context: Context;
+export default class Action {
+  static failOnError = true;
+
   eventManager: EventManager;
-  constructor(context: Context, argv: Args) {
-    this.jira = new Jira({
-      baseUrl: argv.config.baseUrl,
-      token: argv.config.token,
-      email: argv.config.email,
-    });
 
-    this.config = argv.config;
-    this.argv = argv;
-    this.context = context;
-    this.eventManager = new EventManager(context, this.jira, argv);
+  constructor(context: Context, argv: Arguments) {
+    Action.failOnError = argv.failOnError;
+    let jira: Jira;
+    try {
+      jira = new Jira(argv.config);
+    } catch (error) {
+      throw new ActionError(`Action:constructor: Failed to create Jira instance:`, error);
+    }
+    try {
+      this.eventManager = new EventManager(context, jira, argv);
+    } catch (error) {
+      throw new ActionError(`Action:constructor: Failed to create EventManager instance:`, error);
+    }
   }
 
-  async execute(): Promise<boolean> {
-    try {
-      await this.eventManager.getJiraKeysFromGitRange();
-      return true;
-    } catch (error) {
-      core.error(error as Error);
-      return false;
-    }
+  async execute(): Promise<Result<boolean, ActionError>> {
+    return this.eventManager.getJiraKeysFromGitRange();
   }
 }

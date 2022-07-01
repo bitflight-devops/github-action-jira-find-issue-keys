@@ -3,10 +3,13 @@ import type { Config } from '@jest/types';
 
 // Sync object
 const config: Config.InitialOptions = {
+  collectCoverage: false,
+  collectCoverageFrom: ['src/**/*.ts'],
+  coverageReporters: ['lcov'],
   clearMocks: true,
-  moduleFileExtensions: ['js', 'ts'],
+  moduleFileExtensions: ['ts', 'tsx', 'mts', 'mtsx', 'js', 'jsx', 'mjs', 'mjsx', 'json', 'node'],
   testEnvironment: 'node',
-  testMatch: ['**/__tests__/*.test.ts'],
+  testRegex: ['./__tests__/.+\\.test\\.ts$', './__tests__/.+\\.spec\\.ts$'],
   testRunner: 'jest-circus/runner',
   transform: {
     '^.+\\.ts$': 'ts-jest',

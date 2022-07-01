@@ -1,13 +1,25 @@
 {
+  "editor.rulers": [
+    120
+  ],
   "eslint.packageManager": "yarn",
   "eslint.codeAction.showDocumentation": {
     "enable": true
   },
   "editor.formatOnSave": true,
-  "eslint.alwaysShowStatus": true,
-  "[json]": {
-    "editor.defaultFormatter": "Trunk.io"
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "files.associations": {
+    "*.shot": "jest-snapshot"
   },
+  "vsicons.associations.files": [
+    {
+      "icon": "jest_snapshot",
+      "extensions": [
+        ".shot",
+      ],
+      "extends": "jest_snapshot"
+    },
+  ],
   "eslint.validate": [
     "javascript",
     "typescript",
@@ -22,14 +34,7 @@
       "html"
     ]
   },
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true,
-  },
-  "[typescript]": {
-    "editor.codeActionsOnSave": {
-      "source.fixAll.eslint": true
-    }
-  },
+
   "yaml.customTags": [
     "!Equals sequence",
     "!FindInMap sequence",
@@ -59,5 +64,8 @@
     "!Select",
     "!Split"
   ],
-  "jest.jestCommandLine": "yarn run test"
+  "jest.jestCommandLine": "node_modules/jest/bin/jest.js --runInBand --no-cache --no-coverage",
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  }
 }

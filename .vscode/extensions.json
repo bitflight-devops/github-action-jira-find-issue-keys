@@ -22,6 +22,11 @@
         "redhat.vscode-yaml",
         "eg2.vscode-npm-script",
         "christian-kohler.npm-intellisense",
-        "yzhang.markdown-all-in-one"
-    ]
+        "yzhang.markdown-all-in-one",
+        "tlent.jest-snapshot-language-support"
+      ],
+      "unwantedRecommendations": [
+        "hookyqr.beautify",
+        "dbaeumer.jshint"
+      ]
 }

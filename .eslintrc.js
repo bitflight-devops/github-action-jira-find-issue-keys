@@ -1,32 +1,91 @@
+const pp = 'plugin:prettier/recommended';
+
 module.exports = {
   root: true,
+
+  env: {
+    es2022: true,
+  },
+  parserOptions: {
+    ecmaVersion: 'latest',
+  },
   overrides: [
     {
-      files: ['*.yml', '*.yaml'],
-      parser: 'yaml-eslint-parser',
-      extends: ['plugin:yml/recommended', 'plugin:yml/prettier', 'plugin:prettier/recommended'],
+      files: ['*.html', '*.json', '*.md'],
+      extends: [pp],
     },
     {
-      files: ['*.html', '*.js', '*.json', '*.jsx', '*.md'],
-      extends: ['auto', 'plugin:prettier/recommended'],
-    },
-    {
-      plugins: ['actions'],
+      extends: ['plugin:actions/recommended'],
       files: ['.github/workflows/*.{yml,yaml}'],
-      processor: 'actions/actions',
     },
     {
+      files: ['*.cjs', '*.js'],
+      plugins: ['simple-import-sort', 'import'],
+      extends: [
+        'airbnb-base',
+        // 'plugin:sonarjs/recommended',
+        // 'plugin:unicorn/recommended',
+        'plugin:import/errors',
+        'plugin:import/warnings',
+        'eslint:recommended',
+        pp,
+      ],
+      env: { es2022: true, node: true },
+      parser: '@babel/eslint-parser',
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'script',
+      },
+      rules: {
+        'import/extensions': 'off',
+        'sonarjs/no-duplicate-string': 'off',
+      },
+    },
+    {
+      settings: {
+        'react': {
+          version: 'latest',
+        },
+        'import/resolver': {
+          node: {
+            extensions: ['.js', '.jsx', '.ts', '.tsx'],
+            moduleDirectory: ['node_modules', 'src/'],
+          },
+        },
+      },
+
       files: ['*.ts'],
-      plugins: ['simple-import-sort', 'import', 'jest', '@typescript-eslint', 'security', 'github'],
-      extends: ['eslint:recommended', 'plugin:security/recommended'],
+      plugins: ['jest', 'neverthrow'],
+      extends: [
+        'plugin:neverthrow/recommended',
+        'airbnb-base',
+        // 'plugin:sonarjs/recommended',
+        // 'plugin:unicorn/recommended',
+        'eslint:recommended',
+        'plugin:import/typescript',
+        'plugin:@typescript-eslint/recommended',
+        // 'plugin:@typescript-eslint/recommended-requiring-type-checking',
+        'plugin:security/recommended',
+        pp,
+      ],
       parser: '@typescript-eslint/parser',
       parserOptions: {
-        ecmaVersion: 'es2021',
+        ecmaVersion: 'latest',
         sourceType: 'module',
-        project: ['./tsconfig.json', './__tests__/tsconfig.json'],
+        project: ['./tsconfig.eslint.json', './__tests__/tsconfig.json'],
         tsconfigRootDir: __dirname,
       },
       rules: {
+        'no-console': 'off',
+        "lines-between-class-members": "off",
+        "@typescript-eslint/lines-between-class-members": ["error"],
+        'one-var': 'off',
+        'import/prefer-default-export': 'off',
+        'import/extensions': 'off',
+        'consistent-return': 'off',
+        'import/prefer-default-import': 'off',
+        'unicorn/import': 'off',
+        'unicorn/import-style': 'off',
         'security/detect-object-injection': 'off',
         'no-plusplus': 'off',
         'simple-import-sort/imports': 'error',
@@ -81,8 +140,7 @@ module.exports = {
       },
       env: {
         'node': true,
-        'es6': true,
-        'es2021': true,
+        'es2022': true,
         'jest/globals': true,
       },
     },

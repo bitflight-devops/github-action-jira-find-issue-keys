@@ -1,7 +1,8 @@
 export interface JiraConfig {
-  baseUrl: string;
-  token: string;
-  email: string;
+  [key: string]: string | undefined;
+  baseUrl?: string;
+  token?: string;
+  email?: string;
   transitionId?: string;
   project?: string;
   issuetype?: string;
@@ -9,7 +10,16 @@ export interface JiraConfig {
   description?: string;
   issue?: string;
 }
-export interface Args {
+export interface JiraAuthConfig {
+  [index: string]: string | undefined;
+  baseUrl: string;
+  token: string;
+  email: string;
+  string?: string;
+}
+
+export interface Arguments {
+  [index: string]: string | boolean | JiraAuthConfig | undefined;
   token: string;
   string: string;
   headRef?: string;
@@ -21,20 +31,15 @@ export interface Args {
   failOnError: boolean;
   config: JiraAuthConfig;
   githubApiBaseUrl?: string;
+  enterpriseServerVersion: string;
 }
 
-export interface JiraAuthConfig {
-  baseUrl: string;
-  token: string;
-  email: string;
-}
-
-export interface RefRange {
+export interface ReferenceRange {
   headRef: string;
   baseRef: string;
 }
 
 export interface ProjectFilter {
-  projectsIncluded?: string[];
-  projectsExcluded?: string[];
+  projectsIncluded: string[];
+  projectsExcluded: string[];
 }

@@ -3,7 +3,7 @@
   "version": "1.0.11",
   "root": true,
   "description": "This action will find the issue keys in the GitHub event and return them as a comma separated list",
-  "main": "dist/index.js",
+  "main": "lib/index.js",
   "displayName": "bitflight-devops/github-action-jira-find-issue-keys",
   "repository": {
     "type": "git",
@@ -12,37 +12,46 @@
   "bugs": {
     "url": "https://github.com/bitflight-devops/github-action-jira-find-issue-keys/issues"
   },
-  "keywords": ["actions", "github", "node16", "jira", "tickets"],
+  "keywords": [
+    "actions",
+    "github",
+    "node16",
+    "jira",
+    "tickets"
+  ],
   "author": "Jamie Nelson <jamie@bitflight.io>",
   "license": "MIT",
   "private": true,
   "scripts": {
-    "eslint": "eslint --color --ext .html,.js,.json,.jsx,.md,.ts,.tsx,.yml,.yaml .github src __tests__",
-    "eslint:fix": "yarn run eslint -- --fix",
-    "tsc": "tsc --project tsconfig.json",
-    "test": "NODE_ENV=testing jest",
-    "test-ci": "NODE_ENV=testing jest --ci --reporters=default --reporters=jest-junit",
-    "typecheck": "tsc --noEmit --project tsconfig.json",
-    "package": "yarn run build",
-    "build": "rimraf lib;yarn run typecheck;node .github/scripts/esbuild.cjs",
-    "clean": "rimraf dist",
-    "format": "prettier --list-different \"./{**/,}*.{ts,js,json,md,yml}\"",
-    "format:fix": "prettier --write \"./{**/,}*.{ts,js,json,md,yml}\"",
-    "lint": "yarn run eslint",
-    "lint:fix": "yon run format:fix;yarn run eslint:fix",
-    "lint:markdown": "markdownlint \"**/*.md\" --config=.markdownlint.json --ignore-path=.markdownlintignore",
+    "all": "yarn run build && yarn run format && yarn run lint && yarn run package && yarn run test",
+    "build": "node .github/scripts/esbuild.cjs",
+    "clean": "yarn exec rimraf lib",
+    "codegen": "yarn exec graphql-codegen --config codegen.yml",
+    "commit": "yarn exec git-cz",
+    "format": "yarn exec prettier --list-different \"./{**/,}*.{ts,js,json,md,yml}\"",
+    "format:fix": "yarn exec prettier --write \"./{**/,}*.{ts,js,json,md,yml}\"",
+    "format:quick": "yarn exec pretty-quick",
+    "generate-docs": "yarn exec github-action-readme-generator && yarn exec prettier --write .ghadocs.json README.md && git add .ghadocs.json README.md",
+    "lint": "yarn run lint:ts",
+    "lint:fix": "yarn run lint:ts:fix",
+    "lint:all": "yarn exec eslint -c ./.eslintrc.js --color ./",
+    "lint:ts": "yarn exec eslint -c ./.eslintrc.js --color --cache --ext '.ts' ./",
+    "lint:all:fix": "yarn run format:quick;yarn lint --fix",
+    "lint:ts:fix": "yarn run format:quick;yarn lint --fix",
+    "lint:markdown": "yarn exec markdownlint \"**/*.md\" --config=.markdownlint.json --ignore-path=.markdownlintignore",
     "lint:markdown:fix": "yarn lint:markdown --fix",
-    "all": "yon run build && yon run format && yon run lint && yon run package && yon test",
-    "commit": "git-cz",
-    "pre-add": "yarn format:fix",
-    "pre-commit": "yarn run lint:fix && yon run build && git add dist && yarn run generate-docs",
-    "pre-push": "yarn format",
-    "preversion": "echo 'Running test';yon test",
-    "version": "echo 'Run versioning commands';yon generate-docs;echo \"::set-output name=tag::v${npm_package_version}\"",
+    "package": "yarn run build",
     "postversion": "echo 'Running post versioning commands';git add . && git commit -m 'update package version' && git push --tags -f && git push && echo \"Successfully released version $npm_package_version!\"",
-    "generate-docs": "github-action-readme-generator && prettier --write .ghadocs.json README.md && git add .ghadocs.json README.md",
-    "prepare": "husky install;git config --global rebase.autosquash true",
-    "codegen": "graphql-codegen --config codegen.yml"
+    "preadd": "yarn run format:quick",
+    "precommit": "yarn run lint:fix && yarn run build && git add lib && yarn run generate-docs",
+    "prepush": "yarn run format",
+    "prebuild": "yarn exec rimraf lib;yarn run typecheck",
+    "prepare": "yarn exec husky install;git config --global rebase.autosquash true",
+    "preversion": "echo 'Running test';yarn run test",
+    "test": "NODE_ENV=testing jest",
+    "test:ci": "NODE_ENV=testing jest --ci --reporters=default --reporters=jest-junit",
+    "tsc": "yarn exec tsc --project tsconfig.json",
+    "typecheck": "yarn exec tsc --project tsconfig.json --noEmit"
   },
   "config": {
     "commitizen": {
@@ -50,13 +59,25 @@
     }
   },
   "commitlint": {
-    "extends": ["@commitlint/config-conventional"],
+    "extends": [
+      "@commitlint/config-conventional"
+    ],
     "rules": {
-      "body-max-length": [0],
-      "body-max-line-length": [0],
-      "footer-max-length": [0],
-      "footer-max-line-length": [0],
-      "header-max-length": [0]
+      "body-max-length": [
+        0
+      ],
+      "body-max-line-length": [
+        0
+      ],
+      "footer-max-length": [
+        0
+      ],
+      "footer-max-line-length": [
+        0
+      ],
+      "header-max-length": [
+        0
+      ]
     }
   },
   "engines": {
@@ -65,53 +86,64 @@
   "exports": {
     ".": {
       "import": "./src/index.ts",
-      "require": "./dist/index.js"
+      "require": "./lib/index.js"
     },
     "./package.json": "./package.json"
   },
-  "files": ["src", "dist"],
+  "files": [
+    "src",
+    "lib"
+  ],
   "dependencies": {
-    "@actions/core": "^1.8.2",
+    "@actions/core": "^1.9.0",
     "@actions/github": "^5.0.3",
+    "@octokit/core": "^3.6.0",
     "@octokit/graphql": "^4.8.0",
+    "@octokit/graphql-schema": "^10.74.1",
+    "@octokit/plugin-enterprise-server": "^11.0.1",
     "@octokit/rest": "^18.12.0",
-    "@tsconfig/node16": "^1.0.2",
+    "@octokit/webhooks-definitions": "^3.67.3",
     "ansi-colors": "^4.1.3",
     "graphql": "^16.5.0",
-    "jira.js": "^2.14.0",
-    "lodash": "^4.17.21",
-    "tslib": "^2.4.0",
-    "yaml": "^2.1.1"
+    "jira.js": "^2.15.2",
+    "js-yaml": "^4.1.0",
+    "neverthrow": "^4.3.1",
+    "tslib": "^2.4.0"
   },
   "devDependencies": {
-    "@Broadshield/prettier-config": "github:Broadshield/prettier-config",
-    "@commitlint/cli": "^17.0.2",
-    "@commitlint/config-conventional": "^17.0.2",
-    "@commitlint/prompt": "^17.0.0",
-    "@github/prettier-config": "^0.0.4",
-    "@octokit/graphql-schema": "^10.73.0",
+    "@babel/code-frame": "^7.18.6",
+    "@babel/core": "^7.18.6",
+    "@babel/eslint-parser": "^7.18.2",
+    "@babel/plugin-proposal-decorators": "^7.18.6",
+    "@babel/preset-env": "^7.18.6",
+    "@babel/types": "^7.18.7",
+    "@broadshield/prettier-config": "^0.3.9",
+    "@commitlint/cli": "^17.0.3",
+    "@commitlint/config-conventional": "^17.0.3",
+    "@commitlint/prompt": "^17.0.3",
     "@prettier/plugin-ruby": "^3.1.2",
     "@prettier/plugin-xml": "^2.2.0",
     "@trunkio/launcher": "^1.1.1",
-    "@types/jest": "^28.1.1",
+    "@tsconfig/node16": "^1.0.3",
+    "@types/babel__code-frame": "^7.0.3",
+    "@types/debug": "^4.1.7",
+    "@types/glob": "^7.2.0",
+    "@types/jest": "^28.1.4",
+    "@types/jest-specific-snapshot": "^0.5.6",
     "@types/js-yaml": "^4.0.5",
-    "@types/lodash": "^4.14.182",
-    "@types/nconf": "^0.10.2",
-    "@types/node": "^17.0.40",
-    "@types/node-fetch": "^2.6.1",
-    "@typescript-eslint/eslint-plugin": "^5.27.0",
-    "@typescript-eslint/parser": "^5.27.0",
-    "@typescript-eslint/typescript-estree": "^5.27.0",
-    "@vercel/ncc": "^0.34.0",
+    "@types/node": "^18.0.0",
+    "@types/node-fetch": "^2.6.2",
+    "@typescript-eslint/eslint-plugin": "^5.30.0",
+    "@typescript-eslint/parser": "^5.30.0",
+    "@typescript-eslint/typescript-estree": "^5.30.0",
     "commitizen": "^4.2.4",
+    "cross-env": "^7.0.3",
     "cz-conventional-changelog": "^3.3.0",
     "dotenv": "^16.0.1",
-    "esbuild": "^0.14.42",
-    "eslint": "^8.17.0",
+    "esbuild": "^0.14.48",
+    "eslint": "^8.18.0",
     "eslint-config-adjunct": "^4.11.1",
     "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-config-airbnb-typescript": "^17.0.0",
-    "eslint-config-auto": "^0.7.1",
     "eslint-config-google": "^0.14.0",
     "eslint-config-prettier": "^8.5.0",
     "eslint-formatter-codeframe": "^7.32.1",
@@ -127,12 +159,13 @@
     "eslint-plugin-lodash": "^7.4.0",
     "eslint-plugin-lodash-fp": "^2.2.0-a1",
     "eslint-plugin-markdown": "^2.2.1",
+    "eslint-plugin-neverthrow": "latest",
     "eslint-plugin-no-constructor-bind": "^2.0.4",
     "eslint-plugin-no-secrets": "^0.8.9",
     "eslint-plugin-no-unsanitized": "^4.0.1",
     "eslint-plugin-no-use-extend-native": "^0.5.0",
     "eslint-plugin-optimize-regex": "^1.2.1",
-    "eslint-plugin-prettier": "^4.0.0",
+    "eslint-plugin-prettier": "^4.2.1",
     "eslint-plugin-promise": "^6.0.0",
     "eslint-plugin-scanjs-rules": "^0.2.1",
     "eslint-plugin-security": "^1.5.0",
@@ -140,27 +173,46 @@
     "eslint-plugin-sonarjs": "^0.13.0",
     "eslint-plugin-sort-class-members": "^1.14.1",
     "eslint-plugin-switch-case": "^1.1.2",
-    "eslint-plugin-unicorn": "^42.0.0",
-    "eslint-plugin-yml": "^1.0.0",
+    "eslint-plugin-unicorn": "^43.0.0",
     "github-action-readme-generator": "^1.0.13",
     "husky": "^8.0.1",
-    "jest": "^28.1.0",
-    "jest-circus": "^28.1.0",
-    "jest-junit": "^13.2.0",
-    "js-yaml": "^4.1.0",
-    "lint-staged": "^13.0.0",
+    "jest": "^28.1.2",
+    "jest-circus": "^28.1.2",
+    "jest-diff": "^28.1.1",
+    "jest-junit": "^14.0.0",
+    "jest-snapshot": "^28.1.2",
+    "jest-specific-snapshot": "^5.0.0",
+    "lint-staged": "^13.0.3",
+    "make-dir": "^3.1.0",
     "markdownlint-cli": "^0.31.1",
-    "prettier": "^2.6.2",
+    "prettier": "^2.7.1",
     "prettier-plugin-java": "^1.6.2",
+    "prettier-plugin-package": "^1.3.0",
     "prettier-plugin-properties": "^0.1.0",
-    "prettier-plugin-sh": "^0.11.0",
+    "prettier-plugin-sh": "^0.12.4",
+    "pretty-format": "^28.1.1",
+    "pretty-quick": "^3.1.3",
     "rimraf": "^3.0.2",
-    "semantic-release": "^19.0.2",
-    "ts-jest": "^28.0.4",
+    "semantic-release": "^19.0.3",
+    "ts-jest": "^28.0.5",
     "ts-node": "^10.8.1",
-    "typescript": "^4.7.3",
-    "typescript-eslint-language-service": "^5.0.0",
-    "yarn-or-npm": "^3.0.1"
+    "typescript": "^4.7.4",
+    "typescript-eslint-language-service": "^5.0.0"
+  },
+  "resolutions": {
+    "typescript": "4.7.2",
+    "@types/node": "^17.0.31",
+    "pretty-format": "^28.1.0",
+    "@jest/create-cache-key-function": "^28",
+    "@jest/reporters": "^28",
+    "@jest/test-result": "^28",
+    "jest-config": "^28",
+    "jest-diff": "^28",
+    "jest-get-type": "^28",
+    "jest-matcher-utils": "^28",
+    "jest-resolve": "^28",
+    "jest-snapshot": "^28",
+    "jest-util": "^28"
   },
   "jest-junit": {
     "suiteNameTemplate": "{filepath}",
@@ -169,6 +221,9 @@
   },
   "lint-staged": {
     "{src,__tests__}/**/*.js": "eslint --cache --fix",
-    "*.ts": ["eslint --cache --fix"]
-  }
+    "*.ts": [
+      "eslint --cache --fix"
+    ]
+  },
+  "packageManager": "yarn@3.2.1"
 }

@@ -1,29 +1,44 @@
 import { Version2Client } from 'jira.js';
 import { IssueBean, IssueTransition, Transitions } from 'jira.js/out/version3/models/index';
 import { DoTransition, GetIssue, GetTransitions } from 'jira.js/out/version3/parameters/index';
+import { err, ok, Result } from 'neverthrow';
 
-import { JiraConfig } from './@types';
+import ActionError from './action-error';
+import { JiraAuthConfig, JiraConfig } from './types';
 
 export default class Jira {
-  baseUrl: string;
-  token: string;
-  email: string;
   client: Version2Client;
 
-  constructor(conf: JiraConfig) {
-    this.baseUrl = conf.baseUrl;
-    this.token = conf.token;
-    this.email = conf.email;
+  constructor(config: JiraAuthConfig) {
+    Jira.ValidateConfig(config).match(
+      () => undefined,
+      (error) => {
+        throw error;
+      },
+    );
+
     this.client = new Version2Client({
-      host: this.baseUrl,
+      host: config.baseUrl,
       telemetry: false,
       authentication: {
         basic: {
-          email: this.email,
-          apiToken: this.token,
+          email: config.email,
+          apiToken: config.token,
         },
       },
     });
+  }
+
+  static ValidateConfig(config: JiraAuthConfig | JiraConfig): Result<boolean, ActionError> {
+    if (!config.email || !config.token || !config.baseUrl) {
+      let errorMessage = '';
+      errorMessage += `JIRA_BASE_URL was ${!config.baseUrl ? 'missing' : 'found'}, `;
+      errorMessage += `JIRA_API_TOKEN was ${!config.token ? 'missing' : 'found'}, `;
+      errorMessage += `and JIRA_USER_EMAIL ${!config.email ? 'missing' : 'found'}, `;
+      errorMessage += `but all are required`;
+      return err(new ActionError(errorMessage));
+    }
+    return ok(true);
   }
 
   async getIssue(
@@ -33,28 +48,28 @@ export default class Jira {
       expand?: string;
     },
   ): Promise<IssueBean> {
-    const params: GetIssue = {
+    const parameters: GetIssue = {
       issueIdOrKey: issueId,
     };
-    if (query != null) {
-      params.fields = query.fields || [];
-      params.expand = query.expand || undefined;
+    if (query !== undefined) {
+      parameters.fields = query.fields || [];
+      parameters.expand = query.expand || undefined;
     }
-    return this.client.issues.getIssue(params);
+    return this.client.issues.getIssue(parameters);
   }
 
   async getIssueTransitions(issueId: string): Promise<Transitions> {
-    const params: GetTransitions = {
+    const parameters: GetTransitions = {
       issueIdOrKey: issueId,
     };
-    return this.client.issues.getTransitions(params);
+    return this.client.issues.getTransitions(parameters);
   }
 
   async transitionIssue(issueId: string, data: IssueTransition): Promise<object> {
-    const params: DoTransition = {
+    const parameters: DoTransition = {
       issueIdOrKey: issueId,
       transition: data,
     };
-    return this.client.issues.doTransition(params);
+    return this.client.issues.doTransition(parameters);
   }
 }

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+const esbuild = require('esbuild');
+
 const ESM_REQUIRE_SHIM = `
 await (async () => {
   const { dirname } = await import("path");
@@ -31,21 +33,29 @@ const shimBanner = {
   js: ESM_REQUIRE_SHIM,
 };
 
+/** @type esbuild.Platform */
+const platform = 'node';
+/** @type esbuild.Format */
+const format = 'esm';
+/** @type esbuild.LogLevel */
+const logLevel = 'info';
 /**
  * ESNext + ESM, bundle: true, and require() shim in banner.
  */
 const buildOptions = {
   entryPoints: ['src/index.ts'],
   sourcemap: true,
-  platform: 'node',
-  outfile: 'lib/main.js',
+  platform,
+  outdir: 'lib',
   target: 'node16',
-  format: 'esm',
+  format,
   banner: bundle ? shimBanner : undefined,
   bundle,
+  treeShaking: true,
+  logLevel,
 };
 
-require('esbuild')
+esbuild
   .build({
     ...buildOptions,
   })
