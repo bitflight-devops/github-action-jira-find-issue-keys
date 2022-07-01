@@ -22,11 +22,12 @@ export default function inputHelper(): Arguments {
     process.env.GITHUB_TOKEN ||
     'NO_TOKEN';
   result.enterpriseServerVersion = core.getInput('github_enterprise_server_version').split('.').join('');
-  result.string = undefinedOnEmpty(core.getInput('string')) ?? '';
+  result.string = core.getInput('string');
+  result.from = core.getInput('from');
   result.baseRef = undefinedOnEmpty(core.getInput('base_ref'));
   result.headRef = undefinedOnEmpty(core.getInput('head_ref'));
-  result.projects = undefinedOnEmpty(core.getInput('projects'));
-  result.projectsIgnore = undefinedOnEmpty(core.getInput('projects_ignore'));
+  result.projects = core.getInput('projects');
+  result.projectsIgnore = core.getInput('projects_ignore');
   result.includeMergeMessages = core.getBooleanInput('include_merge_messages');
   result.ignoreCommits = core.getBooleanInput('ignore_commits');
   result.failOnError = core.getBooleanInput('fail_on_error');

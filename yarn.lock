@@ -1858,7 +1858,6 @@ __metadata:
     dotenv: ^16.0.1
     esbuild: ^0.14.48
     eslint: ^8.18.0
-    eslint-config-adjunct: ^4.11.1
     eslint-config-airbnb-base: ^15.0.0
     eslint-config-google: ^0.14.0
     eslint-config-prettier: ^8.5.0
@@ -6378,21 +6377,6 @@ __metadata:
     lodash.get: ^4.4.2
     lodash.zip: ^4.2.0
   checksum: f72d6875595e665e0707980f3ce36a2e812bf65989dc192c19adfce9d4ca3455c78fcb77f8ffa17a119f24916b2f0a7bf19e02dd2ff0747b9cb83dbcbecf164d
-  languageName: node
-  linkType: hard
-
-"eslint-config-adjunct@npm:^4.11.1":
-  version: 4.11.1
-  resolution: "eslint-config-adjunct@npm:4.11.1"
-  dependencies:
-    arrify: ^2.0.1
-    cosmiconfig: ^7.0.0
-    lodash: ^4.17.21
-    mkdirp: ^1.0.4
-    ramda: ^0.27.1
-    read-pkg-up: 7.0.1
-    rimraf: ^3.0.2
-  checksum: 84204aeef5f2de5fa233eecffdf3374e26631dd0ca6b7ebb75b1502a69dd58b39c7f778b2f07f815656f3be711c80aa6e1f2e31cc97f8cd9ad1d89df26581335
   languageName: node
   linkType: hard
 
@@ -12205,13 +12189,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ramda@npm:^0.27.1":
-  version: 0.27.2
-  resolution: "ramda@npm:0.27.2"
-  checksum: 28d6735dd1eea1a796c56cf6111f3673c6105bbd736e521cdd7826c46a18eeff337c2dba4668f6eed990d539b9961fd6db19aa46ccc1530ba67a396c0a9f580d
-  languageName: node
-  linkType: hard
-
 "rc@npm:^1.2.8":
   version: 1.2.8
   resolution: "rc@npm:1.2.8"
@@ -12284,7 +12261,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"read-pkg-up@npm:7.0.1, read-pkg-up@npm:^7.0.0, read-pkg-up@npm:^7.0.1":
+"read-pkg-up@npm:^7.0.0, read-pkg-up@npm:^7.0.1":
   version: 7.0.1
   resolution: "read-pkg-up@npm:7.0.1"
   dependencies:

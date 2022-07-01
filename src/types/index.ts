@@ -24,8 +24,8 @@ export interface Arguments {
   string: string;
   headRef?: string;
   baseRef?: string;
-  projects?: string;
-  projectsIgnore?: string;
+  projects: string;
+  projectsIgnore: string;
   includeMergeMessages: boolean;
   ignoreCommits: boolean;
   failOnError: boolean;
@@ -35,8 +35,8 @@ export interface Arguments {
 }
 
 export interface ReferenceRange {
-  headRef: string;
-  baseRef: string;
+  headRef?: string;
+  baseRef?: string;
 }
 
 export interface ProjectFilter {

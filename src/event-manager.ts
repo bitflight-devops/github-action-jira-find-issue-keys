@@ -125,7 +125,7 @@ export default class EventManager {
         authorization: `token ${argv.token}`,
       },
     });
-    if (argv.githubApiBaseUrl) {
+    if (argv.githubApiBaseUrl && argv.githubApiBaseUrl.length > 0) {
       core.notice(`Using custom GitHub API base URL ${argv.githubApiBaseUrl} and logging in to an Enterprise Server`);
       const OctokitEnt = GitHub.plugin(EventManager.enterpriseServerPlugin(argv.enterpriseServerVersion));
       this.octokit = new OctokitEnt(getOctokitOptions(argv.token));
@@ -144,12 +144,8 @@ export default class EventManager {
     this.includeMergeMessages = argv.includeMergeMessages;
     this.rawString = argv.string;
     this.filter = {
-      projectsIncluded: argv.projects
-        ? argv.projects?.split(',').map((index: string) => index.trim().toUpperCase())
-        : [],
-      projectsExcluded: argv.projectsIgnore
-        ? argv.projectsIgnore?.split(',').map((index: string) => index.trim().toUpperCase())
-        : [],
+      projectsIncluded: argv.projects.split(',').map((index: string) => index.trim().toUpperCase()),
+      projectsExcluded: argv.projectsIgnore.split(',').map((index: string) => index.trim().toUpperCase()),
     };
   }
 
@@ -201,6 +197,17 @@ export default class EventManager {
       }
     }
     return [...set];
+  }
+
+  static getProjectsFromIssuesSet(issues: Set<string>): Set<string> {
+    const projects = new Set<string>();
+    issues.forEach((issue) => {
+      const project = issue.split('-')[0];
+      if (project) {
+        projects.add(project);
+      }
+    });
+    return projects;
   }
 
   static setToCommaDelimitedString(stringSet: Set<string> | string[] | string | undefined | null): string {
@@ -307,8 +314,15 @@ export default class EventManager {
         new ActionError(`getJiraKeysFromGitRange:`, error).logError();
       }
     }
+
     const combinedSet = new Set<string>([...providedStringArray, ...titleArray, ...combinedArray]);
+
+    const projectsSet: Set<string> = EventManager.getProjectsFromIssuesSet(combinedSet);
     core.setOutput('issues', EventManager.setToCommaDelimitedString(combinedSet));
+    core.setOutput('issue', combinedSet.size > 0 ? combinedSet.values().next().value : '');
+    core.setOutput('projects_excluded', this.filter.projectsExcluded);
+    core.setOutput('projects_included', this.filter.projectsIncluded);
+    core.setOutput('projects_found', EventManager.setToCommaDelimitedString(projectsSet));
     return ok(true);
   }
 }

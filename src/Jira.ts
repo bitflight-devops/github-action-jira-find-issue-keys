@@ -1,6 +1,6 @@
-import { Version2Client } from 'jira.js';
-import { IssueBean, IssueTransition, Transitions } from 'jira.js/out/version3/models/index';
-import { DoTransition, GetIssue, GetTransitions } from 'jira.js/out/version3/parameters/index';
+import { Version2Client } from 'jira.js/out/version2';
+import { Issue, IssueTransition, Transitions } from 'jira.js/out/version2/models/index';
+import { DoTransition, GetIssue, GetTransitions } from 'jira.js/out/version2/parameters/index';
 import { err, ok, Result } from 'neverthrow';
 
 import ActionError from './action-error';
@@ -20,6 +20,7 @@ export default class Jira {
     this.client = new Version2Client({
       host: config.baseUrl,
       telemetry: false,
+      newErrorHandling: true,
       authentication: {
         basic: {
           email: config.email,
@@ -47,7 +48,7 @@ export default class Jira {
       fields?: string[];
       expand?: string;
     },
-  ): Promise<IssueBean> {
+  ): Promise<Issue> {
     const parameters: GetIssue = {
       issueIdOrKey: issueId,
     };

@@ -13,10 +13,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           path: 'github-action-jira-find-issue-keys'
-      - name: Test
-        run: |
-          ls -lah
-          ls -lah github-action-jira-find-issue-keys
       - name: Login
         uses: atlassian/gajira-login@master
         env:
@@ -31,15 +27,65 @@ jobs:
           jira_base_url: ${{ secrets.JIRA_BASE_URL }}
           token: ${{github.token}}
           from: string
-          string: DVPS-342 | will search in branch name
+          string: DVPS-342 | will search in this string name
 
       - name: 'Find issue info'
         shell: bash
         env:
           ISSUE_FOUND: ${{ steps.find.outputs.issue }}
         run: |
+          echo "${{ toJSON(steps.find.outputs) }}"
+          echo "::notice::Issue found: [${{ steps.find.outputs.issue }}]"
           if [[ "${ISSUE_FOUND}" == "DVPS-342" ]];then
-            echo "::info:: Issue ${ISSUE_FOUND} was found"
+            echo "::info::Issue ${ISSUE_FOUND} was found"
           else
-            echo "::error:: Find issue from string failed"
+            echo "::error::Find issue from string failed"
+          fi
+
+      - name: 'Find Issue Key in Project DVPS'
+        id: find
+        uses: ./github-action-jira-find-issue-keys
+        with:
+          jira_base_url: ${{ secrets.JIRA_BASE_URL }}
+          token: ${{github.token}}
+          projects: DVPS
+          from: string
+          string: DVPS-342 | will search in this string name
+
+      - name: 'Find issue info in Project DVPS'
+        shell: bash
+        env:
+          ISSUE_FOUND: ${{ steps.find.outputs.issue }}
+        run: |
+          echo "${{ toJSON(steps.find.outputs) }}"
+          echo "::notice::Issue found: [${{ steps.find.outputs.issue }}"]
+          if [[ "${ISSUE_FOUND}" == "DVPS-342" ]];then
+            echo "::info::Issue ${ISSUE_FOUND} was found"
+          else
+            echo "::error::Find issue from string failed"
+          fi
+
+      - name: 'Find no valid Issue Key in Project SOMEPROJ'
+        id: find
+        uses: ./github-action-jira-find-issue-keys
+        with:
+          jira_base_url: ${{ secrets.JIRA_BASE_URL }}
+          token: ${{github.token}}
+          project: SOMEPROJ
+          from: string
+          string: |
+            DVPS-342 | will search in this string name
+            also this fake key SOMEPROJ-123 will not be found
+
+      - name: 'Find no issue info in Project SOMEPROJ'
+        shell: bash
+        env:
+          ISSUE_FOUND: ${{ steps.find.outputs.issue }}
+        run: |
+          echo "${{ toJSON(steps.find.outputs) }}"
+          echo "::notice::Issue should not be found: [${{ steps.find.outputs.issue }}"]
+          if [[ "${ISSUE_FOUND}" != "DVPS-342" ]];then
+            echo "::info::Issue not found"
+          else
+            echo "::warning::Find issue from string succeded but it should have failed"
           fi

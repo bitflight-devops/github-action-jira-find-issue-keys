@@ -80,6 +80,18 @@ inputs:
     default: 'false'
     required: false
 outputs:
+  projects_included:
+    description: >
+      A comma separated list of projects from the 'projects' input provided
+  projects_excluded:
+    description: >
+      A comma separated list of ignored projects from the 'projects_ignore' input provided
+  projects_found:
+    description: >
+      A comma separated list of project names to include in the results by, i.e. DEVOPS,PROJECT1
+  issue:
+    description: >
+      The first Jira issue key found in the event
   issues:
     description: >
       A comma separated list of all Jira Issues found

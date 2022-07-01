@@ -48,6 +48,9 @@ export async function assignReferences(
     | PullRequestReviewCommentEvent
     | undefined;
   switch (eventName) {
+    case 'pull_request_target':
+      recievedPayload = payload as PullRequestEvent;
+      break;
     case 'pull_request':
       recievedPayload = payload as PullRequestEvent;
       break;
@@ -76,8 +79,6 @@ export async function assignReferences(
   }
   headReference = providedArguments.headRef || headReference;
   baseReference = providedArguments.baseRef || baseReference || headReference;
-  if (!headReference || !baseReference) {
-    throw new ActionError('Head or base reference is missing, and it cannot be determined from the event');
-  }
+
   return { headRef: headReference, baseRef: baseReference };
 }
