@@ -21,7 +21,6 @@ describe('jira ticket transition', () => {
     jest.setTimeout(50_000);
     // Mock getInput
     jest.spyOn(core, 'getInput').mockImplementation((name: string) => {
-      // eslint-disable-next-line security/detect-object-injection
       return inputs[name];
     });
     jest.spyOn(core, 'getBooleanInput').mockImplementation((name: string) => {
@@ -33,7 +32,6 @@ describe('jira ticket transition', () => {
       if (regMatFalse.test(inputs[name])) {
         return false;
       }
-      // eslint-disable-next-line security/detect-object-injection
       throw new ActionError(`
       TypeError: Input does not meet YAML 1.2 "Core Schema" specification: ${name}
       Support boolean input list: true | True | TRUE | false | False | FALSE

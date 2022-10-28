@@ -58,7 +58,7 @@ export default class ActionError extends Error {
     if (!this.stack) {
       this.stack = '';
     }
-    arguments_.forEach((argument) => {
+    for (const argument of arguments_) {
       if (argument instanceof Error) {
         let errorString = '';
 
@@ -82,7 +82,7 @@ export default class ActionError extends Error {
       } else if (typeof argument === 'undefined') {
         this.stack += `\nundefined`;
       }
-    });
+    }
   }
 
   getError(): string {
@@ -117,9 +117,9 @@ export default class ActionError extends Error {
   }
 
   static logErrorMessagesArray(): void {
-    ActionError.errors.forEach((error) => {
+    for (const error of ActionError.errors) {
       core.error(`⛔️ ${ActionError.style.red(error)}`);
-    });
+    }
   }
 
   toString(): string {
@@ -138,8 +138,7 @@ export default class ActionError extends Error {
       typeof providedJson === 'object' ? JSON.stringify(providedJson, undefined, 2) : `${providedJson}`;
     json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return json.replace(
-      // eslint-disable-next-line security/detect-unsafe-regex
-      /("(\\u[\dA-Za-z]{4}|\\[^u]|[^"\\])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[Ee][-+]?\d+)?)/g,
+      /("(\\u[\dA-Za-z]{4}|\\[^u]|[^"\\])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[Ee][+-]?\d+)?)/g,
       (match) => {
         let typeKey = 'number';
         if (match.startsWith('"')) {

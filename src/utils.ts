@@ -48,25 +48,31 @@ export async function assignReferences(
     | PullRequestReviewCommentEvent
     | undefined;
   switch (eventName) {
-    case 'pull_request_target':
+    case 'pull_request_target': {
       recievedPayload = payload as PullRequestEvent;
       break;
-    case 'pull_request':
+    }
+    case 'pull_request': {
       recievedPayload = payload as PullRequestEvent;
       break;
-    case 'pull_request_review':
+    }
+    case 'pull_request_review': {
       recievedPayload = payload as PullRequestReviewEvent;
       break;
-    case 'pull_request_review_comment':
+    }
+    case 'pull_request_review_comment': {
       recievedPayload = payload as PullRequestReviewCommentEvent;
       break;
-    case 'push':
+    }
+    case 'push': {
       recievedPayload = payload as PushEvent;
       break;
-    default:
+    }
+    default: {
       core.warning(`Unhandled event type: ${eventName}`);
       recievedPayload = undefined;
       break;
+    }
   }
   if (recievedPayload) {
     if ('pull_request' in recievedPayload) {

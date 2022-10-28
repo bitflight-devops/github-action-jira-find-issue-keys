@@ -7,27 +7,27 @@ import ActionError from './action-error';
 import { JiraAuthConfig, JiraConfig } from './types';
 
 export default class Jira {
-  client: Version2Client;
+  client!: Version2Client;
 
   constructor(config: JiraAuthConfig) {
     Jira.ValidateConfig(config).match(
-      () => undefined,
+      () => {
+        this.client = new Version2Client({
+          host: config.baseUrl,
+          telemetry: false,
+          newErrorHandling: true,
+          authentication: {
+            basic: {
+              email: config.email,
+              apiToken: config.token,
+            },
+          },
+        });
+      },
       (error) => {
         throw error;
       },
     );
-
-    this.client = new Version2Client({
-      host: config.baseUrl,
-      telemetry: false,
-      newErrorHandling: true,
-      authentication: {
-        basic: {
-          email: config.email,
-          apiToken: config.token,
-        },
-      },
-    });
   }
 
   static ValidateConfig(config: JiraAuthConfig | JiraConfig): Result<boolean, ActionError> {

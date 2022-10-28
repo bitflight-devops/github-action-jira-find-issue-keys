@@ -1,6 +1,6 @@
 dist/
 lib/
-node_modules/
+**/node_modules/
 jest.config.ts
 .eslintrc.js
 commitlint.config.js

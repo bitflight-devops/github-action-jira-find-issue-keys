@@ -31,7 +31,6 @@ jobs:
       - name: Install project dependencies
         run: yarn --prefer-offline
       - run: yarn run build
-      - run: yarn run build
       - run: git add dist
       - run: |
           yarn config set version-tag-prefix "v"

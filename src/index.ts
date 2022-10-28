@@ -19,14 +19,18 @@ async function exec(): Promise<Result<boolean, ActionError>> {
   return actionInstance.execute();
 }
 
-exec().then((actionResult) => {
-  actionResult.match(
-    (success) => core.info(`Action completed successfully [${success}]`),
-    (error) => {
-      error.logError();
-      if (Action.failOnError) {
-        core.setFailed('Failed to complete the action');
-      }
-    },
-  );
-});
+exec()
+  .then((actionResult) => {
+    return actionResult.match(
+      (success) => core.info(`Action completed successfully [${success}]`),
+      (error) => {
+        error.logError();
+        if (Action.failOnError) {
+          core.setFailed('Failed to complete the action');
+        }
+      },
+    );
+  })
+  .catch((error) => {
+    core.setFailed(`index:exec: Failed to execute action: ${error}`);
+  });

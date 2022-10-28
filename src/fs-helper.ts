@@ -1,8 +1,9 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
 import * as core from '@actions/core';
 import * as jsyaml from 'js-yaml';
 import { err, ok, Result } from 'neverthrow';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 
 import ActionError from './action-error';
 import { JiraConfig } from './types';
@@ -177,12 +178,12 @@ export function writeKey(result: string[]): void {
   }
 
   const firstIssue = result[0];
-  result.forEach((issue) => {
+  for (const issue of result) {
     core.debug(`Detected issueKey: ${issue}`);
-  });
+  }
   mkdir(path.dirname(configPath))
     .mapErr((error) => error.logError())
-    .unwrapOr(undefined);
+    .unwrapOr(true);
 
   loadFileSync(configPath).match(
     (content) => {
@@ -202,7 +203,7 @@ export function writeKey(result: string[]): void {
 
   mkdir(path.dirname(cliConfigPath))
     .mapErr((error) => error.logError())
-    .unwrapOr(undefined);
+    .unwrapOr(true);
   loadFileSync(cliConfigPath).match(
     (content) => {
       try {

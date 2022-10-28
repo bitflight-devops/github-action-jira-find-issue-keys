@@ -138,6 +138,7 @@ export default class EventManager {
     assignReferences(context, argv, this.octokit)
       .then((references) => {
         this.refRange = references;
+        return this.refRange;
       })
       .catch((error) => core.error(error));
     this.ignoreCommits = argv.ignoreCommits;
@@ -151,16 +152,21 @@ export default class EventManager {
 
   static enterpriseServerPlugin(version: string): typeof enterpriseServer35 {
     switch (version) {
-      case '35':
+      case '35': {
         return enterpriseServer35;
-      case '34':
+      }
+      case '34': {
         return enterpriseServer34;
-      case '33':
+      }
+      case '33': {
         return enterpriseServer33;
-      case '32':
+      }
+      case '32': {
         return enterpriseServer32;
-      default:
+      }
+      default: {
         return enterpriseServer35;
+      }
     }
   }
 
@@ -189,11 +195,11 @@ export default class EventManager {
       const match = providedString.match(issueIdRegEx);
 
       if (match) {
-        match.forEach((issueKey) => {
+        for (const issueKey of match) {
           if (this.isProjectOfIssueSelected(issueKey)) {
             set.add(issueKey);
           }
-        });
+        }
       }
     }
     return [...set];
@@ -201,12 +207,12 @@ export default class EventManager {
 
   static getProjectsFromIssuesSet(issues: Set<string>): Set<string> {
     const projects = new Set<string>();
-    issues.forEach((issue) => {
+    for (const issue of issues) {
       const project = issue.split('-')[0];
       if (project) {
         projects.add(project);
       }
-    });
+    }
     return projects;
   }
 
@@ -286,7 +292,7 @@ export default class EventManager {
               after = repository?.pullRequest?.commits?.pageInfo.endCursor as string | null;
               if (repository?.pullRequest?.commits?.nodes) {
                 // eslint-disable-next-line no-await-in-loop
-                repository.pullRequest.commits.nodes.forEach((commitNode) => {
+                for (const commitNode of repository.pullRequest.commits.nodes) {
                   if (commitNode) {
                     let skipCommit = false;
                     if (
@@ -302,7 +308,7 @@ export default class EventManager {
                       this.getIssuesFromString(commitNode.commit.message, commitSet);
                     }
                   }
-                });
+                }
               }
             }
           }

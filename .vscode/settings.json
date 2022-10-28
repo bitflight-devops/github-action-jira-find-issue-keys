@@ -8,18 +8,6 @@
   },
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "files.associations": {
-    "*.shot": "jest-snapshot"
-  },
-  "vsicons.associations.files": [
-    {
-      "icon": "jest_snapshot",
-      "extensions": [
-        ".shot",
-      ],
-      "extends": "jest_snapshot"
-    },
-  ],
   "eslint.validate": [
     "javascript",
     "typescript",
@@ -34,6 +22,18 @@
       "html"
     ]
   },
+  "files.associations": {
+    "*.shot": "jest-snapshot"
+  },
+  "vsicons.associations.files": [
+    {
+      "icon": "jest_snapshot",
+      "extensions": [
+        ".shot",
+      ],
+      "extends": "jest_snapshot"
+    },
+  ],
 
   "yaml.customTags": [
     "!Equals sequence",
@@ -67,5 +67,8 @@
   "jest.jestCommandLine": "node_modules/jest/bin/jest.js --runInBand --no-cache --no-coverage",
   "[json]": {
     "editor.defaultFormatter": "vscode.json-language-features"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   }
 }

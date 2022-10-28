@@ -23,6 +23,6 @@ describe('Error handling', () => {
     expect(error.message).toEqual(errorMessage);
     expect(error).toBeInstanceOf(Error);
     error.logError();
-    expect(core.error).toBeCalledTimes(2);
+    expect(core.error).toHaveBeenCalledTimes(2);
   });
 });
