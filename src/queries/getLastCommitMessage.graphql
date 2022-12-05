@@ -1,4 +1,11 @@
-query listCommitMessages($owner: String!, $repo: String!, $ref: String!, $after: String, $endDate: GitTimestamp!, $startDate: GitTimestamp!) {
+query listCommitMessages(
+  $owner: String!
+  $repo: String!
+  $ref: String!
+  $after: String
+  $endDate: GitTimestamp!
+  $startDate: GitTimestamp!
+) {
   repository(owner: $owner, name: $repo) {
     ref(qualifiedName: $ref) {
       target {

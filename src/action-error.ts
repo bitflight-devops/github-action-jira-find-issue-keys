@@ -1,4 +1,4 @@
-import * as core from '@actions/core';
+import { logger } from '@broadshield/github-actions-core-typed-inputs';
 import ansiColors from 'ansi-colors';
 
 const kIsNodeError = Symbol('kIsNodeError');
@@ -79,7 +79,7 @@ export default class ActionError extends Error {
         this.stack += `\n${JSON.stringify(argument, null, 2)}`;
       } else if (typeof argument === 'number') {
         this.stack += `\n${argument}`;
-      } else if (typeof argument === 'undefined') {
+      } else if (argument === undefined) {
         this.stack += `\nundefined`;
       }
     }
@@ -108,17 +108,17 @@ export default class ActionError extends Error {
 
   logErrorStack(): void {
     if (this.stack) {
-      core.error(this.stack);
+      logger.error(this.stack);
     }
   }
 
   logErrorMessage(): void {
-    core.error(`⛔️ ${ActionError.style.red(this.getErrorMessage())}`);
+    logger.error(`⛔️ ${ActionError.style.red(this.getErrorMessage())}`);
   }
 
   static logErrorMessagesArray(): void {
     for (const error of ActionError.errors) {
-      core.error(`⛔️ ${ActionError.style.red(error)}`);
+      logger.error(`⛔️ ${ActionError.style.red(error)}`);
     }
   }
 
@@ -134,8 +134,7 @@ export default class ActionError extends Error {
       null: ActionError.style.bold.cyanBright,
       key: ActionError.style.bold.cyan,
     } as JsonHighlightInterface;
-    let json: string =
-      typeof providedJson === 'object' ? JSON.stringify(providedJson, undefined, 2) : `${providedJson}`;
+    let json: string = JSON.stringify(providedJson, undefined, 2);
     json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return json.replace(
       /("(\\u[\dA-Za-z]{4}|\\[^u]|[^"\\])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[Ee][+-]?\d+)?)/g,

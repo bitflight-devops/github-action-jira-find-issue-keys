@@ -1,23 +1,9 @@
-import * as core from '@actions/core';
-import * as github from '@actions/github';
-import { graphql } from '@octokit/graphql';
-import {
-  enterpriseServer32,
-  enterpriseServer33,
-  enterpriseServer34,
-  enterpriseServer35,
-} from '@octokit/plugin-enterprise-server';
-import { ok, Result } from 'neverthrow';
-
-import ActionError from './action-error';
 import Jira from './Jira';
+import ActionError from './action-error';
 import { Arguments, ProjectFilter, ReferenceRange } from './types';
 import {
   CommitHistoryConnection,
   Context,
-  getOctokitOptions,
-  GitHub,
-  GithubOctokitType,
   GitObject,
   graphqlType,
   Maybe,
@@ -25,6 +11,16 @@ import {
   Repository,
 } from './types/complex-types';
 import { assignReferences, issueIdRegEx } from './utils';
+import { logger, setOutput } from '@broadshield/github-actions-core-typed-inputs';
+import {
+  createOctokit,
+  gql,
+  OctokitInstance,
+  createEnterpriseOctokit,
+  EnterpriseServerVersions,
+} from '@broadshield/github-actions-octokit-hydrated';
+import { graphql } from '@octokit/graphql';
+import { ok, Result } from 'neverthrow';
 
 interface CommitHistory extends GitObject {
   history?: Maybe<CommitHistoryConnection>;
@@ -41,57 +37,57 @@ interface DateRange {
   startDate: string;
   endDate: string;
 }
-const GetStartAndEndPoints = `
-query getStartAndEndPoints($owner: String!, $repo: String!, $headRef: String!,$baseRef: String!) {
-  repository(owner: $owner, name: $repo) {
-    endPoint: ref(qualifiedName: $headRef) {
-      ...internalBranchContent
-    }
-    startPoint: ref(qualifiedName: $baseRef) {
-      ...internalBranchContent
+const GetStartAndEndPoints = gql`
+  query getStartAndEndPoints($owner: String!, $repo: String!, $headRef: String!, $baseRef: String!) {
+    repository(owner: $owner, name: $repo) {
+      endPoint: ref(qualifiedName: $headRef) {
+        ...internalBranchContent
+      }
+      startPoint: ref(qualifiedName: $baseRef) {
+        ...internalBranchContent
+      }
     }
   }
-}
 
-fragment internalBranchContent on Ref {
-  target {
-    ... on Commit {
-      history(first: 1) {
-        edges {
-          node {
-            committedDate
+  fragment internalBranchContent on Ref {
+    target {
+      ... on Commit {
+        history(first: 1) {
+          edges {
+            node {
+              committedDate
+            }
           }
         }
       }
     }
   }
-}
 `;
-const listCommitMessagesInPullRequest = `
-query listCommitMessagesInPullRequest($owner: String!, $repo: String!, $prNumber: Int!, $after: String) {
-  repository(owner: $owner, name: $repo) {
-    pullRequest(number: $prNumber) {
-      baseRef {
-        name
-      }
-      headRef {
-        name
-      }
-      commits(first: 100, after: $after) {
-        nodes {
-          commit {
-            message
-          }
+const listCommitMessagesInPullRequest = gql`
+  query listCommitMessagesInPullRequest($owner: String!, $repo: String!, $prNumber: Int!, $after: String) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $prNumber) {
+        baseRef {
+          name
         }
-        pageInfo {
-          startCursor
-          hasNextPage
-          endCursor
+        headRef {
+          name
+        }
+        commits(first: 100, after: $after) {
+          nodes {
+            commit {
+              message
+            }
+          }
+          pageInfo {
+            startCursor
+            hasNextPage
+            endCursor
+          }
         }
       }
     }
   }
-}
 `;
 
 export default class EventManager {
@@ -115,7 +111,7 @@ export default class EventManager {
 
   graphqlWithAuth: graphqlType;
 
-  octokit: GithubOctokitType;
+  octokit: OctokitInstance;
 
   constructor(context: Context, jira: Jira, argv: Arguments) {
     this.jira = jira;
@@ -126,11 +122,16 @@ export default class EventManager {
       },
     });
     if (argv.githubApiBaseUrl && argv.githubApiBaseUrl.length > 0) {
-      core.notice(`Using custom GitHub API base URL ${argv.githubApiBaseUrl} and logging in to an Enterprise Server`);
-      const OctokitEnt = GitHub.plugin(EventManager.enterpriseServerPlugin(argv.enterpriseServerVersion));
-      this.octokit = new OctokitEnt(getOctokitOptions(argv.token));
+      logger.notice(`Using custom GitHub API base URL ${argv.githubApiBaseUrl} and logging in to an Enterprise Server`);
+      this.octokit = createEnterpriseOctokit(
+        argv.enterpriseServerVersion as keyof EnterpriseServerVersions,
+        argv.token,
+        {
+          baseUrl: argv.githubApiBaseUrl,
+        },
+      );
     } else {
-      this.octokit = github.getOctokit(argv.token);
+      this.octokit = createOctokit(argv.token);
     }
 
     this.context = context;
@@ -140,52 +141,32 @@ export default class EventManager {
         this.refRange = references;
         return this.refRange;
       })
-      .catch((error) => core.error(error));
+      .catch((error) => logger.error(error));
     this.ignoreCommits = argv.ignoreCommits;
     this.includeMergeMessages = argv.includeMergeMessages;
     this.rawString = argv.string;
     this.filter = {
-      projectsIncluded: argv.projects.split(',').map((index: string) => index.trim().toUpperCase()),
-      projectsExcluded: argv.projectsIgnore.split(',').map((index: string) => index.trim().toUpperCase()),
+      projectsIncluded: argv.projects?.split(',').map((index: string) => index.trim().toUpperCase()),
+      projectsExcluded: argv.projectsIgnore?.split(',').map((index: string) => index.trim().toUpperCase()),
     };
-  }
-
-  static enterpriseServerPlugin(version: string): typeof enterpriseServer35 {
-    switch (version) {
-      case '35': {
-        return enterpriseServer35;
-      }
-      case '34': {
-        return enterpriseServer34;
-      }
-      case '33': {
-        return enterpriseServer33;
-      }
-      case '32': {
-        return enterpriseServer32;
-      }
-      default: {
-        return enterpriseServer35;
-      }
-    }
   }
 
   isProjectOfIssueSelected(issueKey?: string): boolean {
     const project = issueKey ? issueKey.split('-')[0] : undefined;
     if (!project || project.length === 0) return false;
     if (this.filter.projectsExcluded && this.filter.projectsExcluded.includes(project.toUpperCase())) {
-      core.debug(`${issueKey} is excluded because of a specific project filter exclusion`);
+      logger.debug(`${issueKey} is excluded because of a specific project filter exclusion`);
       return false;
     }
     if (this.filter.projectsIncluded?.length === 0) {
-      core.debug(`${issueKey} is included because there is no specific project filter`);
+      logger.debug(`${issueKey} is included because there is no specific project filter`);
       return true;
     }
     if (this.filter.projectsIncluded.includes(project.trim().toUpperCase())) {
-      core.debug(`${issueKey} is included because there its part of the specific project filter`);
+      logger.debug(`${issueKey} is included because there its part of the specific project filter`);
       return true;
     }
-    core.debug(`${issueKey} is excluded because it doesn't belong to the included projects`);
+    logger.debug(`${issueKey} is excluded because it doesn't belong to the included projects`);
     return false;
   }
 
@@ -247,25 +228,25 @@ export default class EventManager {
   async getJiraKeysFromGitRange(): Promise<Result<boolean, ActionError>> {
     const providedStringArray: string[] = this.getIssuesFromString(this.rawString);
     if (this.rawString) {
-      core.debug(`Raw string provided is: ${this.rawString}`);
-      core.setOutput('string_issues', EventManager.setToCommaDelimitedString(providedStringArray));
+      logger.debug(`Raw string provided is: ${this.rawString}`);
+      setOutput('string_issues', EventManager.setToCommaDelimitedString(providedStringArray));
     }
     const titleArray: string[] = this.getIssuesFromString(this.context.payload?.pull_request?.title);
     if (this.context.eventName.startsWith('pull_request')) {
-      core.debug(`Pull request title is: ${this.context.payload?.pull_request?.title}`);
-      core.setOutput('title_issues', EventManager.setToCommaDelimitedString(titleArray));
+      logger.debug(`Pull request title is: ${this.context.payload?.pull_request?.title}`);
+      setOutput('title_issues', EventManager.setToCommaDelimitedString(titleArray));
     }
     const combinedArray: string[] = [];
     if (this.refRange && this.refRange.baseRef && this.refRange.headRef) {
       const refDetails = this.refRange
         ? `, Head Ref: ${this.refRange?.headRef}, Base Ref: ${this.refRange?.baseRef}`
         : '';
-      core.info(`EventName: ${this.context.eventName}${refDetails}`);
-      core.info(
+      logger.info(`EventName: ${this.context.eventName}${refDetails}`);
+      logger.info(
         `getJiraKeysFromGitRange: Getting list of github commits between ${this.refRange?.baseRef} and ${this.refRange?.headRef}`,
       );
       const referenceArray: string[] = this.getIssuesFromString(this.refRange.headRef);
-      core.setOutput('ref_issues', EventManager.setToCommaDelimitedString(referenceArray));
+      setOutput('ref_issues', EventManager.setToCommaDelimitedString(referenceArray));
       combinedArray.push(...referenceArray);
 
       const commitSet = new Set<string>();
@@ -295,11 +276,9 @@ export default class EventManager {
                 for (const commitNode of repository.pullRequest.commits.nodes) {
                   if (commitNode) {
                     let skipCommit = false;
-                    if (
-                      commitNode.commit.message.startsWith('Merge branch') ||
-                      commitNode.commit.message.startsWith('Merge pull')
-                    ) {
-                      core.debug('Commit message indicates that it is a merge');
+                    const m = commitNode.commit.message;
+                    if (m.startsWith('Merge branch') || m.startsWith('Merge pull')) {
+                      logger.debug('Commit message indicates that it is a merge');
                       if (!this.includeMergeMessages) {
                         skipCommit = true;
                       }
@@ -313,7 +292,7 @@ export default class EventManager {
             }
           }
 
-          core.setOutput('commit_issues', EventManager.setToCommaDelimitedString(commitSet));
+          setOutput('commit_issues', EventManager.setToCommaDelimitedString(commitSet));
           combinedArray.push(...commitSet);
         }
       } catch (error) {
@@ -324,11 +303,11 @@ export default class EventManager {
     const combinedSet = new Set<string>([...providedStringArray, ...titleArray, ...combinedArray]);
 
     const projectsSet: Set<string> = EventManager.getProjectsFromIssuesSet(combinedSet);
-    core.setOutput('issues', EventManager.setToCommaDelimitedString(combinedSet));
-    core.setOutput('issue', combinedSet.size > 0 ? combinedSet.values().next().value : '');
-    core.setOutput('projects_excluded', this.filter.projectsExcluded);
-    core.setOutput('projects_included', this.filter.projectsIncluded);
-    core.setOutput('projects_found', EventManager.setToCommaDelimitedString(projectsSet));
+    setOutput('issues', EventManager.setToCommaDelimitedString(combinedSet));
+    setOutput('issue', combinedSet.size > 0 ? combinedSet.values().next().value : '');
+    setOutput('projects_excluded', this.filter.projectsExcluded);
+    setOutput('projects_included', this.filter.projectsIncluded);
+    setOutput('projects_found', EventManager.setToCommaDelimitedString(projectsSet));
     return ok(true);
   }
 }

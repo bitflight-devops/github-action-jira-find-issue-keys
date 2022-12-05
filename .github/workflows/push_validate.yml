@@ -12,6 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         name: Checkout
+        with:
+          path: github-action-jira-find-issue-keys
 
       - name: List Issue Transitions
         uses: ./

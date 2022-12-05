@@ -1,29 +1,22 @@
-import * as core from '@actions/core';
-import { Octokit } from '@octokit/rest';
+import ActionError from './action-error';
+import type { Arguments, ReferenceRange } from './types';
+import { Context, logger } from '@broadshield/github-actions-core-typed-inputs';
+import { OctokitInstance } from '@broadshield/github-actions-octokit-hydrated';
 import type {
   PullRequestEvent,
   PullRequestReviewCommentEvent,
   PullRequestReviewEvent,
   PushEvent,
-} from '@octokit/webhooks-definitions/schema';
-
-import ActionError from './action-error';
-import type { Arguments, ReferenceRange } from './types';
-import type { Context, GithubOctokitType } from './types/complex-types';
+} from '@octokit/webhooks-types';
 
 export const issueIdRegEx = /([\dA-Za-z]+-\d+)/g;
-export function undefinedOnEmpty(value?: string): string | undefined {
-  if (!value || value.trim() === '') {
-    return undefined;
-  }
-  return value;
-}
+
 export async function getPreviousReleaseReference(
-  octo: GithubOctokitType,
+  octo: OctokitInstance,
   githubContext: Context,
 ): Promise<string | undefined> {
   if (githubContext && octo) {
-    const releases = await (octo as Octokit).rest.repos.getLatestRelease({
+    const releases = await octo.rest.repos.getLatestRelease({
       ...githubContext.repo,
     });
     return releases?.data?.tag_name;
@@ -33,7 +26,7 @@ export async function getPreviousReleaseReference(
 export async function assignReferences(
   githubContext: Context,
   providedArguments: Arguments,
-  octokit: GithubOctokitType,
+  octokit: OctokitInstance,
 ): Promise<ReferenceRange> {
   let headReference: string | undefined;
   let baseReference: string | undefined;
@@ -69,7 +62,7 @@ export async function assignReferences(
       break;
     }
     default: {
-      core.warning(`Unhandled event type: ${eventName}`);
+      logger.warning(`Unhandled event type: ${eventName}`);
       recievedPayload = undefined;
       break;
     }

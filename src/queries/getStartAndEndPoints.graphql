@@ -1,4 +1,4 @@
-query getStartAndEndPoints($owner: String!, $repo: String!, $headRef: String!,$baseRef: String!) {
+query getStartAndEndPoints($owner: String!, $repo: String!, $headRef: String!, $baseRef: String!) {
   repository(owner: $owner, name: $repo) {
     endPoint: ref(qualifiedName: $headRef) {
       ...internalBranchContent

@@ -6,7 +6,7 @@ branding:
 inputs:
   token:
     description: The github token used for authenticating to GitHub
-    required: true
+    required: false
   from:
     description: >
       Find from predefined place.

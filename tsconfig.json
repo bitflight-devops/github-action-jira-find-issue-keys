@@ -26,6 +26,9 @@
     "sourceMap": true,
     "strict": true,
     "target": "esnext",
+    "types": [
+      "node"
+    ],
     // Ensure that Babel can safely transpile files in the TypeScript project
     "plugins": [
       {

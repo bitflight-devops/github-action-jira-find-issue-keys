@@ -1,10 +1,9 @@
+import ActionError from './action-error';
+import { JiraAuthConfig, JiraConfig } from './types';
 import { Version2Client } from 'jira.js/out/version2';
 import { Issue, IssueTransition, Transitions } from 'jira.js/out/version2/models/index';
 import { DoTransition, GetIssue, GetTransitions } from 'jira.js/out/version2/parameters/index';
 import { err, ok, Result } from 'neverthrow';
-
-import ActionError from './action-error';
-import { JiraAuthConfig, JiraConfig } from './types';
 
 export default class Jira {
   client!: Version2Client;
@@ -33,9 +32,9 @@ export default class Jira {
   static ValidateConfig(config: JiraAuthConfig | JiraConfig): Result<boolean, ActionError> {
     if (!config.email || !config.token || !config.baseUrl) {
       let errorMessage = '';
-      errorMessage += `JIRA_BASE_URL was ${!config.baseUrl ? 'missing' : 'found'}, `;
-      errorMessage += `JIRA_API_TOKEN was ${!config.token ? 'missing' : 'found'}, `;
-      errorMessage += `and JIRA_USER_EMAIL ${!config.email ? 'missing' : 'found'}, `;
+      errorMessage += `JIRA_BASE_URL was ${config.baseUrl ? 'found' : 'missing'}, `;
+      errorMessage += `JIRA_API_TOKEN was ${config.token ? 'found' : 'missing'}, `;
+      errorMessage += `and JIRA_USER_EMAIL ${config.email ? 'found' : 'missing'}, `;
       errorMessage += `but all are required`;
       return err(new ActionError(errorMessage));
     }

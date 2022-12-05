@@ -17,9 +17,10 @@ export interface JiraAuthConfig {
   email: string;
   string?: string;
 }
-
-export interface Arguments {
+export interface ArgumentsIndex {
   [index: string]: string | boolean | JiraAuthConfig | undefined;
+}
+export interface Arguments extends ArgumentsIndex {
   token: string;
   string: string;
   headRef?: string;

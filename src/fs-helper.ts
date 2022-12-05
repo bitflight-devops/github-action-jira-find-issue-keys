@@ -1,12 +1,10 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-
-import * as core from '@actions/core';
-import * as jsyaml from 'js-yaml';
-import { err, ok, Result } from 'neverthrow';
-
 import ActionError from './action-error';
 import { JiraConfig } from './types';
+import { logger } from '@broadshield/github-actions-core-typed-inputs';
+import * as fs from 'graceful-fs';
+import * as jsyaml from 'js-yaml';
+import { err, ok, Result } from 'neverthrow';
+import * as path from 'node:path';
 
 const cliConfigPath = `${process.env.HOME ?? '.'}/.jira.d/config.yml`;
 const configPath = `${process.env.HOME ?? '.'}/jira/config.yml`;
@@ -120,10 +118,10 @@ export function fileExistsSync(filePath: string): Result<boolean, ActionError> {
     if (stats.isDirectory()) {
       return dirIsEmpty(filePath).andThen((isEmpty) => {
         if (isEmpty) {
-          core.error(`Path '${filePath}' is an empty directory, but a config file was expected, removing directory`);
+          logger.error(`Path '${filePath}' is an empty directory, but a config file was expected, removing directory`);
           return removeEmptyDir(filePath).andThen(() => ok(false));
         }
-        core.error(`Path '${filePath}' is a directory, but a file was expected`);
+        logger.error(`Path '${filePath}' is a directory, but a file was expected`);
         return ok(false);
       });
     }
@@ -179,7 +177,7 @@ export function writeKey(result: string[]): void {
 
   const firstIssue = result[0];
   for (const issue of result) {
-    core.debug(`Detected issueKey: ${issue}`);
+    logger.debug(`Detected issueKey: ${issue}`);
   }
   mkdir(path.dirname(configPath))
     .mapErr((error) => error.logError())
@@ -191,7 +189,7 @@ export function writeKey(result: string[]): void {
         const existingConfig = jsyaml.load(content) as JiraConfig;
         const extendedConfig = { ...existingConfig, issue: result };
         fs.writeFileSync(configPath, jsyaml.dump(extendedConfig));
-        core.debug(`Saving ${firstIssue} to ${configPath}`);
+        logger.debug(`Saving ${firstIssue} to ${configPath}`);
       } catch (error) {
         new ActionError(`Failed to write to ${configPath}`, error).logError();
       }
@@ -211,7 +209,7 @@ export function writeKey(result: string[]): void {
 
         const extendedConfig = { ...existingConfig, issue: result };
         fs.writeFileSync(cliConfigPath, jsyaml.dump(extendedConfig));
-        core.debug(`Saving first issue ${firstIssue} to ${cliConfigPath}`);
+        logger.debug(`Saving first issue ${firstIssue} to ${cliConfigPath}`);
       } catch (error) {
         new ActionError(`Failed to write to ${cliConfigPath}`, error).logError();
       }
@@ -232,5 +230,5 @@ export function writeKey(result: string[]): void {
 //   }
 // }
 // githubWorkspacePath = path.resolve(githubWorkspacePath);
-// core.debug(`GITHUB_WORKSPACE = '${githubWorkspacePath}'`);
+// logger.debug(`GITHUB_WORKSPACE = '${githubWorkspacePath}'`);
 // return fsHelper.directoryExistsSync(githubWorkspacePath, true);

@@ -1,10 +1,9 @@
-import { Result } from 'neverthrow';
-
+import Jira from './Jira';
 import ActionError from './action-error';
 import EventManager from './event-manager';
-import Jira from './Jira';
 import type { Arguments } from './types';
 import type { Context } from './types/complex-types';
+import { Result } from 'neverthrow';
 
 export default class Action {
   static failOnError = true;
