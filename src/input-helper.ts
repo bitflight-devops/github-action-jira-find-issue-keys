@@ -1,6 +1,6 @@
 import * as fsHelper from './fs-helper';
 import { Arguments, ArgumentsIndex, JiraAuthConfig, JiraConfig } from './types';
-import { getBooleanInput, getGithubToken, getStringInput } from '@broadshield/github-actions-core-typed-inputs';
+import { getBooleanInput, getGithubToken, getStringInput, logger } from '@broadshield/github-actions-core-typed-inputs';
 
 export default function inputHelper(): Arguments {
   const result: ArgumentsIndex = {};
@@ -24,6 +24,6 @@ export default function inputHelper(): Arguments {
   result.includeMergeMessages = getBooleanInput('include_merge_messages');
   result.ignoreCommits = getBooleanInput('ignore_commits');
   result.failOnError = getBooleanInput('fail_on_error');
-
+  logger.debug(`inputHelper result: ${JSON.stringify(result)}`);
   return result as Arguments;
 }

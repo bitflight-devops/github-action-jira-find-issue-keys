@@ -21,11 +21,11 @@ jobs:
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN || secrets.JIRA_TOKEN}}
 
       - name: 'Find Issue Key'
-        id: find
+        id: find-string
         uses: ./github-action-jira-find-issue-keys
         with:
           jira_base_url: ${{ secrets.JIRA_BASE_URL }}
-          token: ${{github.token}}
+          token: ${{ secrets.RELEASE_TOKEN }}
           from: string
           string: DVPS-342 | will search in this string name
 
@@ -43,11 +43,11 @@ jobs:
           fi
 
       - name: 'Find Issue Key in Project DVPS'
-        id: find
+        id: find-project
         uses: ./github-action-jira-find-issue-keys
         with:
           jira_base_url: ${{ secrets.JIRA_BASE_URL }}
-          token: ${{github.token}}
+          token: ${{ secrets.RELEASE_TOKEN }}
           projects: DVPS
           from: string
           string: DVPS-342 | will search in this string name

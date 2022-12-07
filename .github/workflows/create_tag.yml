@@ -8,52 +8,34 @@ on:
 
 jobs:
   tag:
-    runs-on: ubuntu-20.04
+    if: ${{ !contains(github.context.commits[0].message, 'chore(release):') }}
+    runs-on: ubuntu-22.04
     steps:
-      - name: Set Git User Details
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - uses: bitflight-devops/shell-scripts@v2.2
+        name: Install shell utility scripts
+
+      - name: get email
+        shell: bash
         run: |
-          git config user.name "${GITHUB_USER:-github-actions}"
-          git config user.email "${GITHUB_EMAIL:-github-actions@github.com}"
-      - uses: actions/setup-node@v2.1.5
+          git config --global user.email $(get_last_github_author_email 'wearsafe.jenkins@gmail.com')
+          git config --global user.name $(get_last_github_author_name)
+          echo ${{github.context.commits[0].message}}
+
+      - uses: actions/setup-node@v3
         with:
           node-version: 16.x
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
+          cache: 'yarn'
 
-      - name: Bump version and push tag
-        id: tag_version
-        uses: mathieudutour/github-tag-action@v5.5
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          tag_prefix: 'v'
-          dry_run: 'true'
       - name: Install project dependencies
-        run: yarn --prefer-offline
-      - run: yarn run build
-      - run: git add dist
-      - run: |
-          yarn config set version-tag-prefix "v"
-          yarn config set version-commit-hooks true
-          yarn config set version-git-tag true
-          yarn config set version-sign-git-tag false
-      - name: Update version
-        id: version
-        env:
-          CHANGELOG: |
-            # v%s
-            ${{ steps.tag_version.outputs.changelog }}
-        run: |
-          ## yarn version will update the README with the new tagged version in the examples
-          ## and also creates a step output called 'tag' which is the new version
-          set -x
-          yarn version --patch --message "${CHANGELOG}"
-
-      - name: Create a GitHub release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: yarn install
+      - run: yarn build
+      - uses: undergroundwires/bump-everywhere@master
         with:
-          tag_name: ${{steps.version.outputs.tag}}
-          release_name: Release ${{steps.version.outputs.tag}}
-          body: ${{ steps.tag_version.outputs.changelog }}
+          commit-message: 'chore(release): ⬆️ bump version to {{ version }}'
+          git-token: ${{ secrets.GITHUB_TOKEN }}
+          release-type: 'release'
+          release-token: ${{ secrets.RELEASE_TOKEN }}

@@ -1,6 +1,6 @@
 {
   "name": "@bitflight-devops/github-action-jira-find-issue-keys",
-  "version": "1.1.2",
+  "version": "1.1.0",
   "root": true,
   "description": "This action will find the issue keys in the GitHub event and return them as a comma separated list",
   "main": "lib/index.js",
@@ -63,9 +63,9 @@
     "node": ">=16.18.1"
   },
   "dependencies": {
-    "@broadshield/github-actions-core-typed-inputs": "1.2.2",
+    "@broadshield/github-actions-core-typed-inputs": "1.3.0",
     "@broadshield/github-actions-octokit-hydrated": "1.4.0",
-    "@octokit/graphql-schema": "^12.35.0",
+    "@octokit/graphql-schema": "^12.35.1",
     "@octokit/plugin-enterprise-server": "^11.3.0",
     "@octokit/webhooks-types": "^6.7.0",
     "ansi-colors": "^4.1.3",
@@ -103,7 +103,7 @@
     "@typescript-eslint/eslint-plugin": "^5.45.1",
     "@typescript-eslint/parser": "^5.45.1",
     "@typescript-eslint/typescript-estree": "^5.45.1",
-    "commitizen": "^4.2.6",
+    "commitizen": "^4.2.5",
     "cross-env": "^7.0.3",
     "cz-conventional-changelog": "^3.3.0",
     "dotenv": "^16.0.3",
@@ -129,7 +129,6 @@
     "eslint-plugin-optimize-regex": "^1.2.1",
     "eslint-plugin-prettier": "^4.2.1",
     "eslint-plugin-promise": "^6.1.1",
-    "eslint-plugin-simple-import-sort": "^8.0.0",
     "eslint-plugin-sonarjs": "^0.17.0",
     "eslint-plugin-sort-class-members": "^1.16.0",
     "eslint-plugin-switch-case": "^1.1.2",

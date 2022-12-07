@@ -30,4 +30,5 @@ git push origin ":${stub_major}" 2>/dev/null || true
 git push origin ":${stub_major_minor}" 2>/dev/null || true
 yarn postversion
 git push
+git push --tags
 # yarn release:post

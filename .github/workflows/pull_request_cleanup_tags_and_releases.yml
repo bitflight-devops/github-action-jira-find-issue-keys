@@ -25,7 +25,7 @@ jobs:
       - name: Remove unused releases and tags
         uses: Broadshield/github-action-cleanup-releases-and-tags@main
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
         with:
           regex: ${{ github.event.inputs.regex }}
           pr_number: ${{ github.event.inputs.pr_number }}
@@ -38,4 +38,4 @@ jobs:
           repository: ${{ github.repository }}
           older-than-seconds: 604800 # remove all workflow runs older than 7 days
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
