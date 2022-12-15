@@ -2,9 +2,9 @@ name: 🏷️ Update Package Version and Create Tag
 on:
   push:
     branches:
-      - 'main'
+      - "main"
     tags-ignore:
-      - '**'
+      - "**"
 
 jobs:
   tag:
@@ -28,14 +28,14 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 16.x
-          cache: 'yarn'
+          cache: "yarn"
 
       - name: Install project dependencies
         run: yarn install
       - run: yarn build
       - uses: undergroundwires/bump-everywhere@master
         with:
-          commit-message: 'chore(release): ⬆️ bump version to {{ version }}'
+          commit-message: "chore(release): ⬆️ bump version to {{ version }}"
           git-token: ${{ secrets.GITHUB_TOKEN }}
-          release-type: 'release'
+          release-type: "release"
           release-token: ${{ secrets.RELEASE_TOKEN }}

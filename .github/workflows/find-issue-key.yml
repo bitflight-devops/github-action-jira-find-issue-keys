@@ -1,18 +1,18 @@
 # @prettier
 on: push
 
-name: 'Test Find Issue Key'
+name: "Test Find Issue Key"
 
 jobs:
   test-find-issue-key:
-    name: 'Find Issue Key'
+    name: "Find Issue Key"
     runs-on: ubuntu-20.04
     permissions: write-all
     steps:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          path: 'github-action-jira-find-issue-keys'
+          path: "github-action-jira-find-issue-keys"
       - name: Login
         uses: atlassian/gajira-login@master
         env:
@@ -20,16 +20,16 @@ jobs:
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL || secrets.JIRA_EMAIL}}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN || secrets.JIRA_TOKEN}}
 
-      - name: 'Find Issue Key'
+      - name: "Find Issue Key"
         id: find-string
         uses: ./github-action-jira-find-issue-keys
         with:
           jira_base_url: ${{ secrets.JIRA_BASE_URL }}
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ github.token }}
           from: string
           string: DVPS-342 | will search in this string name
 
-      - name: 'Find issue info'
+      - name: "Find issue info"
         shell: bash
         env:
           ISSUE_FOUND: ${{ steps.find.outputs.issue }}
@@ -42,17 +42,17 @@ jobs:
             echo "::error::Find issue from string failed"
           fi
 
-      - name: 'Find Issue Key in Project DVPS'
+      - name: "Find Issue Key in Project DVPS"
         id: find-project
         uses: ./github-action-jira-find-issue-keys
         with:
           jira_base_url: ${{ secrets.JIRA_BASE_URL }}
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ github.token }}
           projects: DVPS
           from: string
           string: DVPS-342 | will search in this string name
 
-      - name: 'Find issue info in Project DVPS'
+      - name: "Find issue info in Project DVPS"
         shell: bash
         env:
           ISSUE_FOUND: ${{ steps.find.outputs.issue }}
@@ -65,7 +65,7 @@ jobs:
             echo "::error::Find issue from string failed"
           fi
 
-      - name: 'Find no valid Issue Key in Project SOMEPROJ'
+      - name: "Find no valid Issue Key in Project SOMEPROJ"
         id: find
         uses: ./github-action-jira-find-issue-keys
         with:
@@ -77,7 +77,7 @@ jobs:
             DVPS-342 | will search in this string name
             also this fake key SOMEPROJ-123 will not be found
 
-      - name: 'Find no issue info in Project SOMEPROJ'
+      - name: "Find no issue info in Project SOMEPROJ"
         shell: bash
         env:
           ISSUE_FOUND: ${{ steps.find.outputs.issue }}
