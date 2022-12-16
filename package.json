@@ -63,8 +63,8 @@
     "node": ">=16.18.1"
   },
   "dependencies": {
-    "@broadshield/github-actions-core-typed-inputs": "1.3.0",
-    "@broadshield/github-actions-octokit-hydrated": "1.4.0",
+    "@broadshield/github-actions-core-typed-inputs": "1.3.2",
+    "@broadshield/github-actions-octokit-hydrated": "1.4.2",
     "@octokit/graphql-schema": "^12.35.1",
     "@octokit/plugin-enterprise-server": "^11.3.0",
     "@octokit/webhooks-types": "^6.7.0",

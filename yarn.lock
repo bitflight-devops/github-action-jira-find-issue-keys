@@ -1463,8 +1463,8 @@ __metadata:
     "@babel/plugin-proposal-decorators": ^7.20.5
     "@babel/preset-env": ^7.20.2
     "@babel/types": ^7.20.5
-    "@broadshield/github-actions-core-typed-inputs": 1.3.0
-    "@broadshield/github-actions-octokit-hydrated": 1.4.0
+    "@broadshield/github-actions-core-typed-inputs": 1.3.2
+    "@broadshield/github-actions-octokit-hydrated": 1.4.2
     "@commitlint/cli": ^17.3.0
     "@commitlint/config-conventional": ^17.3.0
     "@commitlint/prompt": ^17.3.0
@@ -1555,9 +1555,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@broadshield/github-actions-core-typed-inputs@npm:0.0.2":
-  version: 0.0.2
-  resolution: "@broadshield/github-actions-core-typed-inputs@npm:0.0.2"
+"@broadshield/github-actions-core-typed-inputs@npm:1.3.2":
+  version: 1.3.2
+  resolution: "@broadshield/github-actions-core-typed-inputs@npm:1.3.2"
   dependencies:
     "@actions/core": 1.10.0
     "@actions/github": 5.1.1
@@ -1565,35 +1565,20 @@ __metadata:
     "@octokit/request": 6.2.2
     "@octokit/types": 8.0.0
     tslib: 2.4.1
-  checksum: 1e1269055fb61b7597ef731cd186f3413ee7a71c380438380ea0b34c850d59fb1bf63f91b3c90a97004d19b1492684180b791b1ed97a44f2a5248d913caf0628
+  checksum: 52fafcdd427bb07b0135481109bf43ae68c21bb27d1df8dacd3c0053019cc7742f9a680c0de9b795b3c1018c9de1b8214a37442c162979513f0bca7ab98fe561
   languageName: node
   linkType: hard
 
-"@broadshield/github-actions-core-typed-inputs@npm:1.3.0":
-  version: 1.3.0
-  resolution: "@broadshield/github-actions-core-typed-inputs@npm:1.3.0"
+"@broadshield/github-actions-octokit-hydrated@npm:1.4.2":
+  version: 1.4.2
+  resolution: "@broadshield/github-actions-octokit-hydrated@npm:1.4.2"
   dependencies:
     "@actions/core": 1.10.0
     "@actions/github": 5.1.1
-    "@octokit/auth-token": 3.0.2
-    "@octokit/request": 6.2.2
-    "@octokit/types": 8.0.0
-    tslib: 2.4.1
-  checksum: 2f6d8beaecd691308c983038767c026c218d3075af6e238c42a4a48475519fad7facd526500693c84c91bfe24bb65418d9b863f13e665e0816e5ad52b88471ba
-  languageName: node
-  linkType: hard
-
-"@broadshield/github-actions-octokit-hydrated@npm:1.4.0":
-  version: 1.4.0
-  resolution: "@broadshield/github-actions-octokit-hydrated@npm:1.4.0"
-  dependencies:
-    "@actions/core": 1.10.0
-    "@actions/github": 5.1.1
-    "@broadshield/github-actions-core-typed-inputs": 0.0.2
+    "@broadshield/github-actions-core-typed-inputs": 1.3.2
     "@octokit/auth-token": 3.0.2
     "@octokit/core": 4.1.0
-    "@octokit/graphql": 5.0.4
-    "@octokit/graphql-schema": 12.33.0
+    "@octokit/graphql-schema": 12.41.0
     "@octokit/plugin-enterprise-server": 11.3.0
     "@octokit/plugin-paginate-rest": 5.0.1
     "@octokit/plugin-rest-endpoint-methods": 6.7.0
@@ -1602,7 +1587,7 @@ __metadata:
     "@octokit/rest": 19.0.5
     "@octokit/types": 8.0.0
     tslib: 2.4.1
-  checksum: f796bb1a76825ec17f29f77bbb6f6f2ed10ad82aeefd4ee6c8a42dfb9260e77460b57556411748667141de50ceecab1f94e6248922cad7efb0088620d4c2bc40
+  checksum: 7d9b6f9a6f30c5d07bf50f5a72c02c51fcba062f11ee61f421607aa8584f2874e6e38a29656c1155ca879a78c5ea951457452c2042c1df54af90565eb26cb2b7
   languageName: node
   linkType: hard
 
@@ -2670,13 +2655,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@octokit/graphql-schema@npm:12.33.0":
-  version: 12.33.0
-  resolution: "@octokit/graphql-schema@npm:12.33.0"
+"@octokit/graphql-schema@npm:12.41.0":
+  version: 12.41.0
+  resolution: "@octokit/graphql-schema@npm:12.41.0"
   dependencies:
     graphql: ^16.0.0
     graphql-tag: ^2.10.3
-  checksum: ccd36bfdfc3950329f998fea7cfd5e8b3d9f9b3b81f0716595d4064a9f0dac60e9b2874482cadd02e986ae26dfa5dbc01a517bd4904e7cc010fbc3ea33924215
+  checksum: 34b29e0377a7ec76cd1c5cb8957cdce28f71933f77ab386e0c37f7f7971230e7f52b737168f90eee85bb8b4f5321e0c09b61a39660deaf167f9101ed74675fe2
   languageName: node
   linkType: hard
 
@@ -2690,17 +2675,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@octokit/graphql@npm:5.0.4, @octokit/graphql@npm:^5.0.0":
-  version: 5.0.4
-  resolution: "@octokit/graphql@npm:5.0.4"
-  dependencies:
-    "@octokit/request": ^6.0.0
-    "@octokit/types": ^8.0.0
-    universal-user-agent: ^6.0.0
-  checksum: 8cf65cf7e6608cf3cbc96a2fa902172b4d5dc30e88ee0bae3711bf467a25b828b10cce1aaabb7f82a7580bfbcf7028b91d1dd1a894940945e38ca2deb6509754
-  languageName: node
-  linkType: hard
-
 "@octokit/graphql@npm:^4.5.8":
   version: 4.8.0
   resolution: "@octokit/graphql@npm:4.8.0"
@@ -2709,6 +2683,17 @@ __metadata:
     "@octokit/types": ^6.0.3
     universal-user-agent: ^6.0.0
   checksum: f68afe53f63900d4a16a0a733f2f500df2695b731f8ed32edb728d50edead7f5011437f71d069c2d2f6d656227703d0c832a3c8af58ecf82bd5dcc051f2d2d74
+  languageName: node
+  linkType: hard
+
+"@octokit/graphql@npm:^5.0.0":
+  version: 5.0.4
+  resolution: "@octokit/graphql@npm:5.0.4"
+  dependencies:
+    "@octokit/request": ^6.0.0
+    "@octokit/types": ^8.0.0
+    universal-user-agent: ^6.0.0
+  checksum: 8cf65cf7e6608cf3cbc96a2fa902172b4d5dc30e88ee0bae3711bf467a25b828b10cce1aaabb7f82a7580bfbcf7028b91d1dd1a894940945e38ca2deb6509754
   languageName: node
   linkType: hard
 
