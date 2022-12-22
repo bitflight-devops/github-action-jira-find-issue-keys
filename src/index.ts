@@ -4,7 +4,7 @@ import inputHelper from './input-helper';
 import { logger, setFailed, context } from '@broadshield/github-actions-core-typed-inputs';
 import { err, Result } from 'neverthrow';
 
-async function exec(): Promise<Result<boolean, ActionError>> {
+async function exec(): Promise<Result<Set<string>, ActionError>> {
   let actionInstance: Action;
   try {
     actionInstance = new Action(context, inputHelper());
@@ -20,7 +20,7 @@ async function exec(): Promise<Result<boolean, ActionError>> {
 exec()
   .then((actionResult) => {
     return actionResult.match(
-      (success) => logger.info(`Action completed successfully [${success}]`),
+      (success) => logger.info(`Action completed successfully [${[...success].join(', ')}]`),
       (error) => {
         error.logError();
         if (Action.failOnError) {

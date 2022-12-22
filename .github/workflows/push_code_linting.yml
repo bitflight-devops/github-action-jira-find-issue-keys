@@ -24,8 +24,8 @@ jobs:
       - name: get email
         shell: bash
         run: |
-          git config --global user.email $(get_last_github_author_email 'wearsafe.jenkins@gmail.com')
-          git config --global user.name $(get_last_github_author_name)
+          git config --global user.email "$(get_last_github_author_email 'wearsafe.jenkins@gmail.com')"
+          git config --global user.name "$(get_last_github_author_name)"
 
       - name: Install Packages
         run: |

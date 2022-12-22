@@ -1,5 +1,14 @@
 import { logger } from '@broadshield/github-actions-core-typed-inputs';
 import ansiColors from 'ansi-colors';
+import endsWith from 'lodash/endsWith';
+import includes from 'lodash/includes';
+import isError from 'lodash/isError';
+import isNumber from 'lodash/isNumber';
+import isObject from 'lodash/isObject';
+import isString from 'lodash/isString';
+import replace from 'lodash/replace';
+import split from 'lodash/split';
+import startsWith from 'lodash/startsWith';
 
 const kIsNodeError = Symbol('kIsNodeError');
 export type LogLevel = 'debug' | 'info' | 'warning' | 'notice' | 'error';
@@ -28,8 +37,8 @@ export function instanceOfNodeError<T extends new (...arguments_: any) => Error>
 ): value is InstanceType<T> & NodeJS.ErrnoException {
   return value instanceof errorType;
 }
-export function isError(error: any): error is NodeJS.ErrnoException {
-  return error instanceof Error;
+export function isNodeError(error: any): error is NodeJS.ErrnoException {
+  return isError(error);
 }
 export default class ActionError extends Error {
   static errors: string[] = [];
@@ -59,11 +68,11 @@ export default class ActionError extends Error {
       this.stack = '';
     }
     for (const argument of arguments_) {
-      if (argument instanceof Error) {
+      if (isNodeError(argument)) {
         let errorString = '';
 
         if (kIsNodeError in argument) {
-          const error = argument as NodeJS.ErrnoException;
+          const error = argument;
           errorString = `${error.name} [${error.code}]: ${error.message}`;
         } else {
           const error = argument;
@@ -71,13 +80,13 @@ export default class ActionError extends Error {
         }
         this.stack += ActionError.prettyString({
           message: errorString,
-          stack: argument.stack ? argument.stack.split('\n') : null,
+          stack: argument.stack ? split(argument.stack, '\n') : null,
         });
-      } else if (typeof argument === 'string') {
+      } else if (isString(argument)) {
         this.stack += `\n${argument}`;
-      } else if (typeof argument === 'object') {
+      } else if (isObject(argument)) {
         this.stack += `\n${JSON.stringify(argument, null, 2)}`;
-      } else if (typeof argument === 'number') {
+      } else if (isNumber(argument)) {
         this.stack += `\n${argument}`;
       } else if (argument === undefined) {
         this.stack += `\nundefined`;
@@ -135,16 +144,19 @@ export default class ActionError extends Error {
       key: ActionError.style.bold.cyan,
     } as JsonHighlightInterface;
     let json: string = JSON.stringify(providedJson, undefined, 2);
-    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    return json.replace(
+    json = replace(json, /&/g, '&amp;');
+    json = replace(json, /</g, '&lt;');
+    json = replace(json, />/g, '&gt;');
+    return replace(
+      json,
       /("(\\u[\dA-Za-z]{4}|\\[^u]|[^"\\])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[Ee][+-]?\d+)?)/g,
       (match) => {
         let typeKey = 'number';
-        if (match.startsWith('"')) {
-          typeKey = match.endsWith(':') ? 'key' : 'string';
+        if (startsWith(match, '"')) {
+          typeKey = endsWith(match, ':') ? 'key' : 'string';
         } else if (/true|false/.test(match)) {
           typeKey = 'boolean';
-        } else if (match.includes('null')) {
+        } else if (includes(match, 'null')) {
           typeKey = 'null';
         }
         return jsonHighlight[typeKey](match);

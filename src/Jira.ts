@@ -6,9 +6,12 @@ import { DoTransition, GetIssue, GetTransitions } from 'jira.js/out/version2/par
 import { err, ok, Result } from 'neverthrow';
 
 export default class Jira {
+  baseUrl: string;
+
   client!: Version2Client;
 
   constructor(config: JiraAuthConfig) {
+    this.baseUrl = config.baseUrl;
     Jira.ValidateConfig(config).match(
       () => {
         this.client = new Version2Client({

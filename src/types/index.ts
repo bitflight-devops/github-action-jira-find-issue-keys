@@ -1,3 +1,5 @@
+import { OctokitInstance } from '@broadshield/github-actions-octokit-hydrated';
+
 export interface JiraConfig {
   [key: string]: string | undefined;
   baseUrl?: string;
@@ -18,7 +20,7 @@ export interface JiraAuthConfig {
   string?: string;
 }
 export interface ArgumentsIndex {
-  [index: string]: string | boolean | JiraAuthConfig | undefined;
+  [index: string]: string | boolean | JiraAuthConfig | undefined | OctokitInstance;
 }
 export interface Arguments extends ArgumentsIndex {
   token: string;
@@ -33,6 +35,7 @@ export interface Arguments extends ArgumentsIndex {
   config: JiraAuthConfig;
   githubApiBaseUrl?: string;
   enterpriseServerVersion: string;
+  octokit?: OctokitInstance;
 }
 
 export interface ReferenceRange {

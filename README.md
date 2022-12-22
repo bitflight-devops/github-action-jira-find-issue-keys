@@ -14,7 +14,7 @@ This action will find the issue keys in the GitHub event and return them as a co
 <!-- start usage -->
 
 ```yaml
-- uses: bitflight-devops/github-action-jira-find-issue-keys@v1.1.4
+- uses: bitflight-devops/github-action-jira-find-issue-keys@v1.1.5
   with:
     # The github token used for authenticating to GitHub
     token: ''
@@ -78,6 +78,10 @@ This action will find the issue keys in the GitHub event and return them as a co
     # If there is an error during transition, the action will error out.
     # Default: false
     fail_on_error: ''
+
+    # Should the pull request be updated with the Jira issue keys found
+    # Default: false
+    update_pull_request: ''
 ```
 
 <!-- end usage -->
@@ -103,6 +107,7 @@ This action will find the issue keys in the GitHub event and return them as a co
 | **`jira_user_email`**                  | The Jira cloud user email address or use environment variable JIRA_USER_EMAIL                                                                                                             |             | **false**    |
 | **`jira_api_token`**                   | The Jira cloud user api token or use environment variable JIRA_API_TOKEN                                                                                                                  |             | **false**    |
 | **`fail_on_error`**                    | If there is an error during transition, the action will error out.                                                                                                                        | `false`     | **false**    |
+| **`update_pull_request`**              | Should the pull request be updated with the Jira issue keys found                                                                                                                         |             | **false**    |
 
 <!-- end inputs -->
 

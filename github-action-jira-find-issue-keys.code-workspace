@@ -5,21 +5,7 @@
     }
   ],
   "settings": {
-    "eslint.alwaysShowStatus": true,
-    "eslint.codeActionsOnSave.mode": "all",
-    "eslint.execArgv": [
-      "--max-old-space-size=16384"
-    ],
-    "eslint.lintTask.enable": true,
-    "eslint.format.enable": true,
-    "eslint.packageManager": "yarn",
-    "eslint.run": "onSave",
     "eslint.useESLintClass": true,
-    "eslint.workingDirectories": [
-      "./"
-    ],
-    "eslint.options": {
-      "overrideConfigFile": "./.eslintrc.js"
-    }
+    "eslint.packageManager": "yarn"
   }
 }

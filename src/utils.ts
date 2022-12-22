@@ -7,10 +7,17 @@ import type {
   PullRequestReviewCommentEvent,
   PullRequestReviewEvent,
   PushEvent,
+  RepositoryDispatchEvent,
+  WorkflowDispatchEvent,
 } from '@octokit/webhooks-types';
+import _ from 'lodash';
 
-export const issueIdRegEx = /([\dA-Za-z]+-\d+)/g;
-
+// eslint-disable-next-line no-useless-escape
+export const strictIssueIdRegEx = /(?<=^|[a-z]-|[\s&P[^cnptu{}\-]])([A-Za-z]\w*[ \-]\d+)(?![^\W_])/;
+export const issueIdRegEx = /([A-Z]\w+[ _-]\d+)/g;
+export function upperCaseFirst(line: string): string {
+  return _.replace(line, /\w\S*/g, (txt) => _.toUpper(txt.charAt(0)) + txt.slice(1));
+}
 export async function getPreviousReleaseReference(
   octo: OctokitInstance,
   githubContext: Context,
@@ -39,6 +46,8 @@ export async function assignReferences(
     | PullRequestEvent
     | PullRequestReviewEvent
     | PullRequestReviewCommentEvent
+    | WorkflowDispatchEvent
+    | RepositoryDispatchEvent
     | undefined;
   switch (eventName) {
     case 'pull_request_target': {
@@ -59,6 +68,14 @@ export async function assignReferences(
     }
     case 'push': {
       recievedPayload = payload as PushEvent;
+      break;
+    }
+    case 'workflow_dispatch': {
+      recievedPayload = payload as WorkflowDispatchEvent;
+      break;
+    }
+    case 'repository_dispatch': {
+      recievedPayload = payload as RepositoryDispatchEvent;
       break;
     }
     default: {

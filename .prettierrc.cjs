@@ -6,7 +6,7 @@ module.exports = {
   proseWrap: 'preserve',
   endOfLine: 'lf',
   embeddedLanguageFormatting: 'auto',
-  trailingComma: 'es5',
+  trailingComma: 'all',
   bracketSpacing: true,
   semi: true,
   arrowParens: 'always',

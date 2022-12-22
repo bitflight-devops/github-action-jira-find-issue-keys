@@ -30,12 +30,13 @@ jobs:
           string: DVPS-342 | will search in this string name
 
       - name: "Find issue info"
+        id: find-issue
         shell: bash
         env:
-          ISSUE_FOUND: ${{ steps.find.outputs.issue }}
+          ISSUE_FOUND: ${{ steps.find-string.outputs.issue }}
         run: |
-          echo "${{ toJSON(steps.find.outputs) }}"
-          echo "::notice::Issue found: [${{ steps.find.outputs.issue }}]"
+          echo "${{ toJSON(steps.find-string.outputs) }}"
+          echo "::notice::Issue found: [${{ steps.find-string.outputs.issue }}]"
           if [[ "${ISSUE_FOUND}" == "DVPS-342" ]];then
             echo "::info::Issue ${ISSUE_FOUND} was found"
           else
@@ -55,14 +56,14 @@ jobs:
       - name: "Find issue info in Project DVPS"
         shell: bash
         env:
-          ISSUE_FOUND: ${{ steps.find.outputs.issue }}
+          ISSUE_FOUND: ${{ steps.find-project.outputs.issue }}
         run: |
-          echo "${{ toJSON(steps.find.outputs) }}"
-          echo "::notice::Issue found: [${{ steps.find.outputs.issue }}"]
+          echo "${{ toJSON(steps.find-project.outputs) }}"
+          echo "::notice::Issue found: [${{ steps.find-project.outputs.issue }}"]
           if [[ "${ISSUE_FOUND}" == "DVPS-342" ]];then
             echo "::info::Issue ${ISSUE_FOUND} was found"
           else
-            echo "::error::Find issue from string failed"
+            echo "::error::find-project issue from string failed"
           fi
 
       - name: "Find no valid Issue Key in Project SOMEPROJ"

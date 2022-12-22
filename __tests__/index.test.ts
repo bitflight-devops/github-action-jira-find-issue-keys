@@ -1,11 +1,14 @@
 import Action from '../src/action';
 import inputHelper from '../src/input-helper';
 import { Arguments } from '../src/types';
+import { strictIssueIdRegEx } from '../src/utils';
 import * as ghac from '@broadshield/github-actions-core-typed-inputs';
+import { createOctokit } from '@broadshield/github-actions-octokit-hydrated';
+import _ from 'lodash';
 
+const fakeheadRef = 'refs/heads/DVPS-331';
 const baseUrl = process.env.JIRA_BASE_URL as string;
-
-const [owner, repo] = (process.env.GITHUB_REPOSITORY || '').split('/');
+const [owner, repo] = _.split(process.env.GITHUB_REPOSITORY || '', '/');
 const originalContext = { ...ghac.context };
 const { env } = process;
 describe('jira ticket transition', () => {
@@ -26,7 +29,7 @@ describe('jira ticket transition', () => {
       };
     });
 
-    ghac.context.ref = 'refs/heads/DVPS-331';
+    ghac.context.ref = fakeheadRef;
     ghac.context.sha = '1234567890123456789012345678901234567890';
   });
 
@@ -62,21 +65,32 @@ describe('jira ticket transition', () => {
     jest.restoreAllMocks();
   });
 
+  it('matches two keys in regex', () => {
+    const testString = `[unicOrn 10183],[UNICORN-10183|- deviceLimitSupportUrl - system line`;
+    const match = strictIssueIdRegEx.exec(testString);
+    expect(match).toBeTruthy();
+    expect(match?.length).toEqual(2);
+    for (const m of match ?? []) {
+      expect(m).toMatch(/UNICORN-\d+/);
+    }
+  });
+
   it('sets defaults', () => {
     const settings: Arguments = inputHelper();
     expect(settings).toBeTruthy();
     expect(settings.config).toBeTruthy();
-    expect(settings.config.baseUrl).toBe(baseUrl);
+    expect(settings.config.baseUrl).toEqual(baseUrl);
   });
 
   it('GitHub Event: pull_request', async () => {
     expect.hasAssertions();
     ghac.context.payload = {
       pull_request: {
-        head: { ref: 'refs/heads/DVPS-331' },
+        head: { ref: fakeheadRef },
         base: { ref: 'refs/heads/dev' },
         number: 2770,
-        title: 'DVPS-336',
+        title: 'DVPS-336 - the final update',
+        body: '',
       },
     };
     ghac.context.eventName = 'pull_request';
@@ -102,5 +116,44 @@ describe('jira ticket transition', () => {
     const action = new Action(ghac.context, settings);
     const result = await action.execute();
     expect(result.isOk()).toEqual(true);
+  });
+  it('Github Pull Request title and body update', async () => {
+    expect.hasAssertions();
+    process.env['INPUT_UPDATE_PULL_REQUEST'] = 'true';
+    delete process.env['INPUT_STRING'];
+    ghac.context.payload = {
+      pull_request: {
+        head: { ref: fakeheadRef },
+        base: { ref: 'refs/heads/dev' },
+        number: 2770,
+        title: ' dvps 336 | tHIS IS The  TITLE ',
+        body: 'Fix an issue with the new feature',
+      },
+    };
+
+    ghac.context.eventName = 'pull_request';
+    const settings: Arguments = inputHelper();
+    settings.octokit = createOctokit(process.env['GITHUB_TOKEN']);
+    const spy = jest.spyOn(settings.octokit.rest.pulls, 'update').mockImplementation(async (args) => {
+      console.log(args);
+      expect(args?.title).toEqual<string>('DVPS-336: THIS IS The TITLE');
+      expect(args?.body).toEqual<string>(
+        `Fix an issue with the new feature\n\n[/]: / "JIRA-ISSUE-TEXT-START"\n### Linked Jira Issues:\n\n*  **[DVPS-336](https://wearsafe.atlassian.net/browse/DVPS-336)** [Testing] GitHub Action - Test Jira Transitions\n\n[/]: / "JIRA-ISSUE-TEXT-END"`,
+      );
+      return {} as any;
+    });
+    const action = new Action(ghac.context, settings);
+    const result = await action.execute();
+
+    spy.mockRestore();
+    expect(result.isOk()).toBe(true);
+    result.match(
+      (v: Set<string>) => {
+        expect(v).toBeInstanceOf(Set<string>);
+        expect(v.size).toBe(1);
+        expect(v.has('DVPS-336')).toBe(true);
+      },
+      (e: Error) => expect(e).toBeUndefined(),
+    );
   });
 });

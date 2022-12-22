@@ -25,7 +25,7 @@ export default class Action {
     }
   }
 
-  async execute(): Promise<Result<boolean, ActionError>> {
+  async execute(): Promise<Result<Set<string>, ActionError>> {
     return this.eventManager.getJiraKeysFromGitRange();
   }
 }

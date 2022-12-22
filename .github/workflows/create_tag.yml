@@ -8,8 +8,8 @@ on:
 
 jobs:
   tag:
-    if: ${{ !contains(github.context.commits[0].message, 'chore(release):') }}
-    runs-on: ubuntu-22.04
+    if: ${{ !contains(github.event.commits[0].message, 'chore(release):') }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -20,10 +20,12 @@ jobs:
 
       - name: get email
         shell: bash
+        env:
+          commits: ${{github.event.commits[0].message}}
         run: |
-          git config --global user.email $(get_last_github_author_email 'jamie@bitflight.io')
-          git config --global user.name $(get_last_github_author_name)
-          echo ${{github.context.commits[0].message}}
+          git config --global user.email "$(get_last_github_author_email 'jamie@bitflight.io')"
+          git config --global user.name "$(get_last_github_author_name)"
+          echo "commits: ${commits}"
 
       - uses: actions/setup-node@v3
         with:

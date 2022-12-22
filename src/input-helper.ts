@@ -10,7 +10,6 @@ export default function inputHelper(): Arguments {
     token: getStringInput('jira_api_token', process.env.JIRA_API_TOKEN || jiraConfigBase?.token),
     email: getStringInput('jira_user_email', process.env.JIRA_USER_EMAIL || jiraConfigBase?.email),
   };
-
   result.config = jiraConfig as JiraAuthConfig;
   result.githubApiBaseUrl = getStringInput('github_api_url');
   result.token = getGithubToken('token');
@@ -24,6 +23,7 @@ export default function inputHelper(): Arguments {
   result.includeMergeMessages = getBooleanInput('include_merge_messages');
   result.ignoreCommits = getBooleanInput('ignore_commits');
   result.failOnError = getBooleanInput('fail_on_error');
-  logger.debug(`inputHelper result: ${JSON.stringify(result)}`);
+  result.update_pull_request = getBooleanInput('update_pull_request');
+  logger.debug(`inputHelper result: ${JSON.stringify(result, undefined, 2)}`);
   return result as Arguments;
 }

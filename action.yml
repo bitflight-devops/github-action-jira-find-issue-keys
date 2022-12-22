@@ -79,6 +79,11 @@ inputs:
     description: If there is an error during transition, the action will error out.
     default: 'false'
     required: false
+  update_pull_request:
+    description: >
+      Should the pull request be updated with the Jira issue keys found
+    required: false
+    default: false
 outputs:
   projects_included:
     description: >

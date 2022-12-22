@@ -27,7 +27,8 @@
     "strict": true,
     "target": "esnext",
     "types": [
-      "node"
+      "node",
+      "jest"
     ],
     // Ensure that Babel can safely transpile files in the TypeScript project
     "plugins": [

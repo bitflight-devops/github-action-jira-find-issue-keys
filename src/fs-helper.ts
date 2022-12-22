@@ -3,6 +3,7 @@ import { JiraConfig } from './types';
 import { logger } from '@broadshield/github-actions-core-typed-inputs';
 import * as fs from 'graceful-fs';
 import * as jsyaml from 'js-yaml';
+import _ from 'lodash';
 import { err, ok, Result } from 'neverthrow';
 import * as path from 'node:path';
 
@@ -10,7 +11,7 @@ const cliConfigPath = `${process.env.HOME ?? '.'}/.jira.d/config.yml`;
 const configPath = `${process.env.HOME ?? '.'}/jira/config.yml`;
 const filepathError = 'filePath must not be empty';
 function isError(error: any): error is NodeJS.ErrnoException {
-  return error instanceof Error;
+  return _.isError(error);
 }
 export function mkdir(filepath: string): Result<boolean, ActionError> {
   if (!filepath) {
@@ -142,33 +143,38 @@ export function loadFileSync(filePath: string): Result<string, ActionError> {
 }
 
 export function readJiraConfig(): JiraConfig {
-  const config: JiraConfig = {
-    baseUrl: undefined,
-    token: undefined,
-    email: undefined,
-  } as JiraConfig;
-
-  loadFileSync(configPath)
-    .map((content) => {
+  let config: JiraConfig = {};
+  config = loadFileSync(configPath).match<JiraConfig>(
+    (content) => {
       const configFromFile = jsyaml.load(content) as JiraConfig;
       config.baseUrl = configFromFile?.baseUrl;
       config.token = configFromFile?.token;
       config.email = configFromFile?.email;
       return config;
-    })
-    .unwrapOr(config);
-
-  loadFileSync(cliConfigPath)
-    .map((content) => {
-      const cliConfigFromFile = jsyaml.load(content) as JiraConfig;
-      config.baseUrl = config?.baseUrl ?? cliConfigFromFile?.baseUrl;
-      config.token = config?.token ?? cliConfigFromFile?.token;
-      config.email = config?.email ?? cliConfigFromFile?.email;
+    },
+    () => {
       return config;
-    })
-    .unwrapOr(config);
+    },
+  );
 
-  return config;
+  return loadFileSync(configPath).match<JiraConfig>(
+    (content) => {
+      const cliConfigFromFile = jsyaml.load(content) as JiraConfig;
+      if (!config?.baseUrl) {
+        config.baseUrl = cliConfigFromFile?.baseUrl;
+      }
+      if (!config?.token) {
+        config.token = cliConfigFromFile?.token;
+      }
+      if (!config?.email) {
+        config.email = cliConfigFromFile?.email;
+      }
+      return config;
+    },
+    () => {
+      return config;
+    },
+  );
 }
 export function writeKey(result: string[]): void {
   if (result.length === 0) {
