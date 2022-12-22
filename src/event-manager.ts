@@ -2,16 +2,8 @@ import Jira from './Jira';
 import ActionError, { isNodeError } from './action-error';
 import { JiraIssueObject } from './jira-issue-object';
 import { Arguments, ProjectFilter, ReferenceRange } from './types';
-import {
-  CommitHistoryConnection,
-  Context,
-  GitObject,
-  graphqlType,
-  Maybe,
-  Ref as Reference,
-  Repository,
-} from './types/complex-types';
-import { assignReferences, strictIssueIdRegEx, upperCaseFirst } from './utils';
+import { CommitHistoryConnection, Context, GitObject, graphqlType, Maybe, Ref as Reference, Repository } from './types/complex-types';
+import { assignReferences, normaliseKey, strictIssueIdRegEx, TitleCasePipe } from './utils';
 import { core, logger, setOutput } from '@broadshield/github-actions-core-typed-inputs';
 import {
   createOctokit,
@@ -201,8 +193,8 @@ export default class EventManager {
 
       if (match) {
         for (const issueKey of match) {
-          if (this.isProjectOfIssueSelected(issueKey)) {
-            set.add(issueKey);
+          if (this.isProjectOfIssueSelected(normaliseKey(issueKey))) {
+            set.add(normaliseKey(issueKey));
           }
         }
       }
@@ -411,11 +403,12 @@ export default class EventManager {
 
       if (issueKeys.length > 0) {
         try {
-          const re = /(?:(?:[ ,:[\]_|-]|^)*[A-Za-z]\w{2,8}[ _-]\d{3,5}(?:[ ,:[\]_|-]+|$))*(?<title>.*)$/;
+          const re =
+            /(?:^|[ [])*(?<=^|[a-z]-|[\s&P[\]^cnptu{}\-])([A-Za-z]\w*[ \-]\d+)(?![^\W_])[ ,:[\]|\-]*(?<title>.*)$/;
 
           const { groups } = newTitle.match(re) || {};
           if (groups) {
-            const titleString = upperCaseFirst(trim(groups.title));
+            const titleString = TitleCasePipe(replace(trim(groups.title), /\s+/g, ' '));
             newTitle = `${join(issueKeys, ',')}: ${titleString}`.slice(0, 71);
             logger.debug(`Revised PR Title: ${newTitle}`);
             setOutput('title', `${titleString}`);

@@ -149,6 +149,7 @@ module.exports = {
         'import/prefer-default-import': 'off',
         'import/no-unresolved': 'off',
         'dot-notation': 'off',
+        'unicorn/no-hex-escape': 'off',
         '@typescript-eslint/dot-notation': [
           'warn',
           {

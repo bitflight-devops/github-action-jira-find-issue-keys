@@ -1,7 +1,7 @@
 import Action from '../src/action';
 import inputHelper from '../src/input-helper';
 import { Arguments } from '../src/types';
-import { strictIssueIdRegEx } from '../src/utils';
+import { normaliseKey, strictIssueIdRegEx } from '../src/utils';
 import * as ghac from '@broadshield/github-actions-core-typed-inputs';
 import { createOctokit } from '@broadshield/github-actions-octokit-hydrated';
 import _ from 'lodash';
@@ -71,7 +71,7 @@ describe('jira ticket transition', () => {
     expect(match).toBeTruthy();
     expect(match?.length).toEqual(2);
     for (const m of match ?? []) {
-      expect(m).toMatch(/UNICORN-\d+/);
+      expect(normaliseKey(m)).toMatch(/UNICORN-\d+/);
     }
   });
 
@@ -136,7 +136,7 @@ describe('jira ticket transition', () => {
     settings.octokit = createOctokit(process.env['GITHUB_TOKEN']);
     const spy = jest.spyOn(settings.octokit.rest.pulls, 'update').mockImplementation(async (args) => {
       console.log(args);
-      expect(args?.title).toEqual<string>('DVPS-336: THIS IS The TITLE');
+      expect(args?.title).toEqual<string>('DVPS-336: This Is The Title');
       expect(args?.body).toEqual<string>(
         `Fix an issue with the new feature\n\n[/]: / "JIRA-ISSUE-TEXT-START"\n### Linked Jira Issues:\n\n*  **[DVPS-336](https://wearsafe.atlassian.net/browse/DVPS-336)** [Testing] GitHub Action - Test Jira Transitions\n\n[/]: / "JIRA-ISSUE-TEXT-END"`,
       );
