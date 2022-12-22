@@ -3,7 +3,6 @@ import { logger } from '@broadshield/github-actions-core-typed-inputs';
 import _ from 'lodash';
 import TurndownService from 'turndown';
 
-
 export interface LoadIssueDataInterface {
   [key: string]: string | boolean | Jira | undefined;
   jira?: Jira;
