@@ -1,6 +1,6 @@
 {
   "name": "@bitflight-devops/github-action-jira-find-issue-keys",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "root": true,
   "description": "This action will find the issue keys in the GitHub event and return them as a comma separated list",
   "main": "lib/index.js",
