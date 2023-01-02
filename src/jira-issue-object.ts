@@ -1,7 +1,7 @@
 import Jira from './Jira';
 import { logger } from '@broadshield/github-actions-core-typed-inputs';
 import _ from 'lodash';
-import TurndownService from 'turndown';
+import { NodeHtmlMarkdown } from 'node-html-markdown';
 
 export interface LoadIssueDataInterface {
   [key: string]: string | boolean | Jira | undefined;
@@ -10,8 +10,6 @@ export interface LoadIssueDataInterface {
 }
 export class JiraIssueObject {
   private static jira?: Jira = undefined;
-
-  private static turndownService = new TurndownService();
 
   static setJira(jira: Jira): void {
     this.jira = jira;
@@ -93,8 +91,8 @@ export class JiraIssueObject {
       const jiraIssue = await jira.getIssue(this.key, query);
       const descriptionHTML = jiraIssue?.renderedFields?.description;
       this.description = descriptionHTML
-        ? JiraIssueObject.turndownService.turndown(descriptionHTML ?? '')
-        : jiraIssue?.fields?.summary ?? '';
+        ? NodeHtmlMarkdown.translate(/* html */ descriptionHTML ?? '', /* options (optional) */ {})
+        : jiraIssue.fields.summary ?? '';
       this.projectKey = jiraIssue?.fields?.project?.key;
       this.projectName = jiraIssue?.fields?.project?.name;
       this.fixVersions = _.map(jiraIssue?.fields?.fixVersions, (f) => f.name);

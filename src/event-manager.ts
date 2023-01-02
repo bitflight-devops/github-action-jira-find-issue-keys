@@ -2,7 +2,15 @@ import Jira from './Jira';
 import ActionError, { isNodeError } from './action-error';
 import { JiraIssueObject } from './jira-issue-object';
 import { Arguments, ProjectFilter, ReferenceRange } from './types';
-import { CommitHistoryConnection, Context, GitObject, graphqlType, Maybe, Ref as Reference, Repository } from './types/complex-types';
+import {
+  CommitHistoryConnection,
+  Context,
+  GitObject,
+  graphqlType,
+  Maybe,
+  Ref as Reference,
+  Repository,
+} from './types/complex-types';
 import { assignReferences, normaliseKey, strictIssueIdRegEx, TitleCasePipe } from './utils';
 import { core, logger, setOutput } from '@broadshield/github-actions-core-typed-inputs';
 import {

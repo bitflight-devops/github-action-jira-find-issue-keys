@@ -2,7 +2,14 @@ import ActionError from './action-error';
 import type { Arguments, ReferenceRange } from './types';
 import { Context, logger } from '@broadshield/github-actions-core-typed-inputs';
 import { OctokitInstance } from '@broadshield/github-actions-octokit-hydrated';
-import type { PullRequestEvent, PullRequestReviewCommentEvent, PullRequestReviewEvent, PushEvent, RepositoryDispatchEvent, WorkflowDispatchEvent } from '@octokit/webhooks-types';
+import type {
+  PullRequestEvent,
+  PullRequestReviewCommentEvent,
+  PullRequestReviewEvent,
+  PushEvent,
+  RepositoryDispatchEvent,
+  WorkflowDispatchEvent,
+} from '@octokit/webhooks-types';
 import isString from 'lodash/isString';
 import replace from 'lodash/replace';
 import toLower from 'lodash/toLower';
@@ -33,7 +40,7 @@ export function TitleCasePipe(value: string | null | undefined): string | null {
     throw new TypeError(`TitlecaseError: ${value} is not a string`);
   }
 
-  return replace(value, unicodeWordMatch, (txt) => toUpper(txt[0]) + toLower(txt.substring(1)));
+  return replace(value, unicodeWordMatch, (txt) => toUpper(txt[0]) + toLower(txt.slice(1)));
 }
 export function normaliseKey(key: string): string {
   return replace(toUpper(key), ' ', '-');
