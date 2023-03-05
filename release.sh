@@ -27,5 +27,5 @@ git tag -a "${stub_major_minor}" -m "Release ${newtag}"
 # git push origin ":${stub_major_minor}" 2> /dev/null || true
 # git push origin ":${newtag}" 2> /dev/null || true
 git push -f --tags
-git push -f
+git push
 # yarn release:post
