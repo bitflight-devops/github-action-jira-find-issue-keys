@@ -110,3 +110,7 @@ typings/
 
 # TernJS port file
 .tern-port
+
+
+# IntelliJ IDE
+.idea
