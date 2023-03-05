@@ -6,6 +6,7 @@ import * as ghac from '@broadshield/github-actions-core-typed-inputs';
 import { createOctokit } from '@broadshield/github-actions-octokit-hydrated';
 import _ from 'lodash';
 
+
 const fakeheadRef = 'refs/heads/DVPS-331';
 const baseUrl = process.env.JIRA_BASE_URL as string;
 const [owner, repo] = _.split(process.env.GITHUB_REPOSITORY || '', '/');
@@ -43,7 +44,7 @@ describe('jira ticket transition', () => {
     process.env['INPUT_TOKEN'] = process.env['GITHUB_TOKEN'] ?? '';
     process.env['INPUT_INCLUDE_MERGE_MESSAGES'] = 'true';
     process.env['INPUT_PROJECTS'] = 'DVPS';
-    process.env['INPUT_PRROJECTS_IGNORE'] = 'JAVA';
+    process.env['INPUT_PROJECTS_IGNORE'] = 'JAVA';
     process.env['INPUT_HEAD_REF'] = '';
     process.env['INPUT_BASE_REF'] = '';
     process.env['INPUT_IGNORE_COMMITS'] = 'false';
@@ -80,6 +81,29 @@ describe('jira ticket transition', () => {
     expect(settings).toBeTruthy();
     expect(settings.config).toBeTruthy();
     expect(settings.config.baseUrl).toEqual(baseUrl);
+  });
+
+  it('detects all projects when input projects are empty', async () => {
+    process.env['INPUT_PROJECTS'] = '';
+    process.env['INPUT_PROJECTS_IGNORE'] = '';
+    process.env['INPUT_STRING'] = '';
+
+    ghac.context.payload = {
+      pull_request: {
+        head: { ref: fakeheadRef },
+        base: { ref: 'refs/heads/foo' },
+        number: 2770,
+        title: 'OTHER-513 and a title',
+        body: '',
+      },
+    };
+    ghac.context.eventName = 'pull_request';
+    const settings: Arguments = inputHelper();
+    const action = new Action(ghac.context, settings);
+    const result = await action.execute();
+
+    const expected = new Set(['OTHER-513']);
+    expect(result._unsafeUnwrap()).toEqual(expected);
   });
 
   it('GitHub Event: pull_request', async () => {

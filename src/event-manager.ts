@@ -21,6 +21,7 @@ import {
   EnterpriseServerVersions,
 } from '@broadshield/github-actions-octokit-hydrated';
 import { graphql } from '@octokit/graphql';
+import compact from 'lodash/compact';
 import includes from 'lodash/includes';
 import isArray from 'lodash/isArray';
 import isArrayLike from 'lodash/isArrayLike';
@@ -170,8 +171,8 @@ export default class EventManager {
     this.includeMergeMessages = argv.includeMergeMessages;
     this.rawString = argv.string;
     this.filter = {
-      projectsIncluded: map(split(argv.projects, ','), (index: string) => toUpper(trim(index))),
-      projectsExcluded: map(split(argv.projectsIgnore, ','), (index: string) => toUpper(trim(index))),
+      projectsIncluded: map(compact(split(argv.projects, ',')), (index: string) => toUpper(trim(index))),
+      projectsExcluded: map(compact(split(argv.projectsIgnore, ',')), (index: string) => toUpper(trim(index))),
     };
   }
 

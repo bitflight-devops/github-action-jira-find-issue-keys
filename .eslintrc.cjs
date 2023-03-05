@@ -99,7 +99,6 @@ module.exports = {
         'jest-async',
         '@typescript-eslint',
         'optimize-regex',
-        'editorconfig',
         'promise',
         'neverthrow',
         'node',
@@ -111,7 +110,6 @@ module.exports = {
         'plugin:promise/recommended',
         'plugin:no-use-extend-native/recommended',
         'plugin:jest/recommended',
-        'plugin:editorconfig/all',
         'eslint:recommended',
         'plugin:@typescript-eslint/recommended',
         'plugin:lodash/recommended',
@@ -146,7 +144,7 @@ module.exports = {
         'import/no-duplicates': 'off',
         'import/no-namespace': 'off',
         'import/prefer-default-export': 'off',
-        'import/prefer-default-import': 'off',
+
         'import/no-unresolved': 'off',
         'dot-notation': 'off',
         'unicorn/no-hex-escape': 'off',
@@ -221,8 +219,6 @@ module.exports = {
         'camelcase': 'off',
         'consistent-return': 'off',
         'eslint-comments/no-use': 'off',
-        'github/no-then': 'off',
-
         'lines-between-class-members': 'off',
         'no-console': 'off',
         'no-plusplus': 'off',
@@ -235,7 +231,7 @@ module.exports = {
         'sonarjs/cognitive-complexity': 'off',
         'space-before-function-paren': 'off',
         'unicorn/filename-case': 'off',
-        'unicorn/import': 'off',
+        'no-underscore-dangle': 'off',
         'unicorn/import-style': 'off',
         'unicorn/no-null': 'off',
         'unicorn/prefer-module': 'off',
@@ -252,9 +248,6 @@ module.exports = {
         '@typescript-eslint/no-unsafe-argument': 'off',
 
         'editorconfig/indent': 'off',
-
-        'simple-import-sort/exports': 'off',
-        'simple-import-sort/imports': 'off',
       },
       globals: {
         NodeJS: true,
