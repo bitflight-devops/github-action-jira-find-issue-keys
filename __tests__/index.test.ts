@@ -6,7 +6,6 @@ import * as ghac from '@broadshield/github-actions-core-typed-inputs';
 import { createOctokit } from '@broadshield/github-actions-octokit-hydrated';
 import _ from 'lodash';
 
-
 const fakeheadRef = 'refs/heads/DVPS-331';
 const baseUrl = process.env.JIRA_BASE_URL as string;
 const [owner, repo] = _.split(process.env.GITHUB_REPOSITORY || '', '/');
