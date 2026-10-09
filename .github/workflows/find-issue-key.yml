@@ -13,13 +13,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           path: "github-action-jira-find-issue-keys"
-      - name: Login
-        uses: atlassian/gajira-login@master
-        env:
-          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
-          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL || secrets.JIRA_EMAIL}}
-          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN || secrets.JIRA_TOKEN}}
-
       - name: "Find Issue Key"
         id: find-string
         uses: ./github-action-jira-find-issue-keys
