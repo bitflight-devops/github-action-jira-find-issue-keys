@@ -20,7 +20,7 @@ concurrency:
 jobs:
   cleanup:
     name: Cleanup Tags and Releases
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Remove unused releases and tags
         uses: Broadshield/github-action-cleanup-releases-and-tags@main
