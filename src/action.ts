@@ -12,9 +12,11 @@ export default class Action {
 
   constructor(context: Context, argv: Arguments) {
     Action.failOnError = argv.failOnError;
-    let jira: Jira;
+    let jira: Jira | undefined;
     try {
-      jira = new Jira(argv.config);
+      if (argv.update_pull_request && context.payload.pull_request) {
+        jira = new Jira(argv.config);
+      }
     } catch (error) {
       throw new ActionError(`Action:constructor: Failed to create Jira instance:`, error);
     }

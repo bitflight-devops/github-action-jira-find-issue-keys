@@ -23,6 +23,7 @@ export interface ArgumentsIndex {
   [index: string]: string | boolean | JiraAuthConfig | undefined | OctokitInstance;
 }
 export interface Arguments extends ArgumentsIndex {
+  from?: string;
   token: string;
   string: string;
   headRef?: string;
@@ -32,6 +33,7 @@ export interface Arguments extends ArgumentsIndex {
   includeMergeMessages: boolean;
   ignoreCommits: boolean;
   failOnError: boolean;
+  update_pull_request: boolean;
   config: JiraAuthConfig;
   githubApiBaseUrl?: string;
   enterpriseServerVersion: string;

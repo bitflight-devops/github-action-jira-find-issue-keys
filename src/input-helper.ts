@@ -1,10 +1,11 @@
 import * as fsHelper from './fs-helper';
 import { Arguments, ArgumentsIndex, JiraAuthConfig, JiraConfig } from './types';
-import { getBooleanInput, getGithubToken, getStringInput, logger } from '@broadshield/github-actions-core-typed-inputs';
+import { getBooleanInput, getStringInput, logger } from '@broadshield/github-actions-core-typed-inputs';
 
 export default function inputHelper(): Arguments {
   const result: ArgumentsIndex = {};
-  const jiraConfigBase: JiraConfig = fsHelper.readJiraConfig();
+  const updatePullRequest = getBooleanInput('update_pull_request', false);
+  const jiraConfigBase: JiraConfig = updatePullRequest ? fsHelper.readJiraConfig() : {};
   const jiraConfig: JiraConfig = {
     baseUrl: getStringInput('jira_base_url', process.env.JIRA_BASE_URL || jiraConfigBase?.baseUrl),
     token: getStringInput('jira_api_token', process.env.JIRA_API_TOKEN || jiraConfigBase?.token),
@@ -12,10 +13,10 @@ export default function inputHelper(): Arguments {
   };
   result.config = jiraConfig as JiraAuthConfig;
   result.githubApiBaseUrl = getStringInput('github_api_url');
-  result.token = getGithubToken('token');
-  result.enterpriseServerVersion = getStringInput('github_enterprise_server_version');
+  result.token = getStringInput('token', process.env.GITHUB_TOKEN || '');
+  result.enterpriseServerVersion = getStringInput('github_enterprise_server_version', '3.5');
   result.string = getStringInput('string');
-  result.from = getStringInput('from');
+  result.from = getStringInput('from', 'commits');
   result.baseRef = getStringInput('base_ref');
   result.headRef = getStringInput('head_ref');
   result.projects = getStringInput('projects');
@@ -23,7 +24,7 @@ export default function inputHelper(): Arguments {
   result.includeMergeMessages = getBooleanInput('include_merge_messages');
   result.ignoreCommits = getBooleanInput('ignore_commits');
   result.failOnError = getBooleanInput('fail_on_error');
-  result.update_pull_request = getBooleanInput('update_pull_request');
-  logger.debug(`inputHelper result: ${JSON.stringify(result, undefined, 2)}`);
+  result.update_pull_request = updatePullRequest;
+  logger.debug(`Issue source: ${result.from}`);
   return result as Arguments;
 }

@@ -11,7 +11,7 @@ export interface LoadIssueDataInterface {
 export class JiraIssueObject {
   private static jira?: Jira = undefined;
 
-  static setJira(jira: Jira): void {
+  static setJira(jira: Jira | undefined): void {
     this.jira = jira;
   }
 

@@ -5,12 +5,12 @@ branding:
   color: 'blue'
 inputs:
   token:
-    description: The github token used for authenticating to GitHub
+    description: GitHub token for reading commit history or updating pull requests; string, branch, and title extraction do not require it
     required: false
   from:
     description: >
       Find from predefined place.
-      Can be 'branch', 'pull_request', 'string', or 'commits', default is 'commits'
+      Can be 'branch', 'pull_request' (title), 'string', 'commits', or 'all'; default is 'commits'
     required: false
     default: commits
   string:
@@ -36,8 +36,7 @@ inputs:
   head_ref:
     description: >
       The Git Head Ref to which commit messages will be collected up to.
-      If the base_ref is included, and the github event is a pull_request or push,
-      The head_ref from the event will be used.
+      Overrides the head reference from the GitHub event when provided.
     required: false
   base_ref:
     description: >
@@ -62,26 +61,27 @@ inputs:
     default: '3.5'
   jira_base_url:
     description: >
-      The Jira cloud base url including protocol i.e. 'https://company.atlassian.net'
-      or use environment variable JIRA_BASE_URL
+      Jira base URL including protocol, or environment variable JIRA_BASE_URL.
+      Required only when update_pull_request is enabled on a pull request event.
     required: false
   jira_user_email:
     description: >
-      The Jira cloud user email address
-      or use environment variable JIRA_USER_EMAIL
+      Jira Cloud email or Data Center Basic-auth username, or environment variable JIRA_USER_EMAIL.
+      Required only for pull request enrichment.
     required: false
   jira_api_token:
     description: >
-      The Jira cloud user api token
-      or use environment variable JIRA_API_TOKEN
+      Jira Cloud API token or Data Center Basic-auth password, or environment variable JIRA_API_TOKEN.
+      Required only for pull request enrichment; this is not a Bearer/PAT input.
     required: false
   fail_on_error:
-    description: If there is an error during transition, the action will error out.
+    description: Fail the step if extraction, Jira enrichment, or the GitHub update fails; enable this for CI validation
     default: 'false'
     required: false
   update_pull_request:
     description: >
-      Should the pull request be updated with the Jira issue keys found
+      Fetch Jira issue details and update the pull request title/body with the keys found.
+      Disabled by default; extraction alone does not contact Jira.
     required: false
     default: false
 outputs:
@@ -114,5 +114,5 @@ outputs:
       A comma separated list of Jira Issues found in the input string
 
 runs:
-  using: 'node16'
+  using: 'node24'
   main: './lib/index.js'
