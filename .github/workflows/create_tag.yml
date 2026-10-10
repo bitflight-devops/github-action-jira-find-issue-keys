@@ -97,10 +97,42 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Create the GitHub release for the published tag
-        uses: softprops/action-gh-release@v2.5.0
+      - name: Create or resume the GitHub release
+        uses: actions/github-script@v8
+        env:
+          RELEASE_TAG: ${{ needs.tag.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.tag.outputs.commit }}
         with:
-          tag_name: ${{ needs.tag.outputs.tag }}
-          target_commitish: ${{ needs.tag.outputs.commit }}
-          name: Release ${{ needs.tag.outputs.tag }}
-          generate_release_notes: true
+          script: |
+            const tag = process.env.RELEASE_TAG;
+            let release;
+            for await (const { data: releases } of github.paginate.iterator(
+              github.rest.repos.listReleases,
+              { ...context.repo, per_page: 100 },
+            )) {
+              release = releases.find(candidate => candidate.tag_name === tag);
+              if (release) break;
+            }
+            if (release && !release.draft) {
+              core.info(`Release ${tag} is already published; nothing to do.`);
+              return;
+            }
+            if (release) {
+              await github.rest.repos.updateRelease({
+                ...context.repo,
+                release_id: release.id,
+                draft: false,
+                make_latest: 'legacy',
+              });
+              core.info(`Published existing draft ${tag}, preserving its notes.`);
+            } else {
+              await github.rest.repos.createRelease({
+                ...context.repo,
+                tag_name: tag,
+                target_commitish: process.env.RELEASE_COMMIT,
+                name: `Release ${tag}`,
+                generate_release_notes: true,
+                make_latest: 'legacy',
+              });
+              core.info(`Created release ${tag}.`);
+            }
