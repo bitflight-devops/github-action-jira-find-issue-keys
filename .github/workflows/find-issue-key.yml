@@ -1,85 +1,52 @@
-# @prettier
-on: push
+name: Test Find Issue Key
+on: [push, pull_request]
 
-name: "Test Find Issue Key"
+permissions:
+  contents: read
 
 jobs:
   test-find-issue-key:
-    name: "Find Issue Key"
+    name: Find Issue Key
     runs-on: ubuntu-24.04
-    permissions: write-all
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v6
         with:
-          path: "github-action-jira-find-issue-keys"
-      - name: "Find Issue Key"
-        id: find-string
-        uses: ./github-action-jira-find-issue-keys
+          persist-credentials: false
+      - name: Extract and deduplicate without credentials
+        id: string
+        uses: ./
         with:
-          jira_base_url: ${{ secrets.JIRA_BASE_URL }}
-          token: ${{ github.token }}
           from: string
-          string: DVPS-342 | will search in this string name
-
-      - name: "Find issue info"
-        id: find-issue
-        shell: bash
-        env:
-          ISSUE_FOUND: ${{ steps.find-string.outputs.issue }}
-        run: |
-          echo "${{ toJSON(steps.find-string.outputs) }}"
-          echo "::notice::Issue found: [${{ steps.find-string.outputs.issue }}]"
-          if [[ "${ISSUE_FOUND}" == "DVPS-342" ]];then
-            echo "::info::Issue ${ISSUE_FOUND} was found"
-          else
-            echo "::error::Find issue from string failed"
-          fi
-
-      - name: "Find Issue Key in Project DVPS"
-        id: find-project
-        uses: ./github-action-jira-find-issue-keys
+          string: 'DVPS-342 DVPS-342 SOMEPROJ-123'
+          fail_on_error: true
+      - name: Include one project
+        id: project
+        uses: ./
         with:
-          jira_base_url: ${{ secrets.JIRA_BASE_URL }}
-          token: ${{ github.token }}
-          projects: DVPS
           from: string
-          string: DVPS-342 | will search in this string name
-
-      - name: "Find issue info in Project DVPS"
-        shell: bash
-        env:
-          ISSUE_FOUND: ${{ steps.find-project.outputs.issue }}
-        run: |
-          echo "${{ toJSON(steps.find-project.outputs) }}"
-          echo "::notice::Issue found: [${{ steps.find-project.outputs.issue }}"]
-          if [[ "${ISSUE_FOUND}" == "DVPS-342" ]];then
-            echo "::info::Issue ${ISSUE_FOUND} was found"
-          else
-            echo "::error::find-project issue from string failed"
-          fi
-
-      - name: "Find no valid Issue Key in Project SOMEPROJ"
-        id: find
-        uses: ./github-action-jira-find-issue-keys
+          string: 'DVPS-342 SOMEPROJ-123'
+          projects: SOMEPROJ
+          fail_on_error: true
+      - name: Exclude all matches
+        id: empty
+        uses: ./
         with:
-          jira_base_url: ${{ secrets.JIRA_BASE_URL }}
-          token: ${{github.token}}
-          project: SOMEPROJ
           from: string
-          string: |
-            DVPS-342 | will search in this string name
-            also this fake key SOMEPROJ-123 will not be found
-
-      - name: "Find no issue info in Project SOMEPROJ"
-        shell: bash
+          string: 'DVPS-342'
+          projects_ignore: DVPS
+          fail_on_error: true
+      - name: Assert actual action outputs
         env:
-          ISSUE_FOUND: ${{ steps.find.outputs.issue }}
+          FIRST_ISSUE: ${{ steps.string.outputs.issue }}
+          ALL_ISSUES: ${{ steps.string.outputs.issues }}
+          FILTERED_ISSUE: ${{ steps.project.outputs.issue }}
+          FILTERED_ISSUES: ${{ steps.project.outputs.issues }}
+          EMPTY_ISSUE: ${{ steps.empty.outputs.issue }}
+          EMPTY_ISSUES: ${{ steps.empty.outputs.issues }}
         run: |
-          echo "${{ toJSON(steps.find.outputs) }}"
-          echo "::notice::Issue should not be found: [${{ steps.find.outputs.issue }}"]
-          if [[ "${ISSUE_FOUND}" != "DVPS-342" ]];then
-            echo "::info::Issue not found"
-          else
-            echo "::warning::Find issue from string succeded but it should have failed"
-          fi
+          test "$FIRST_ISSUE" = 'DVPS-342'
+          test "$ALL_ISSUES" = 'DVPS-342,SOMEPROJ-123'
+          test "$FILTERED_ISSUE" = 'SOMEPROJ-123'
+          test "$FILTERED_ISSUES" = 'SOMEPROJ-123'
+          test -z "$EMPTY_ISSUE"
+          test -z "$EMPTY_ISSUES"

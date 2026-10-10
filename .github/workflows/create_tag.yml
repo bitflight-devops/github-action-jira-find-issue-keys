@@ -2,16 +2,16 @@ name: 🏷️ Update Package Version and Create Tag
 on:
   push:
     branches:
-      - "main"
+      - 'main'
     tags-ignore:
-      - "**"
+      - '**'
 
 jobs:
   tag:
     if: ${{ !contains(github.event.commits[0].message, 'chore(release):') }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -27,17 +27,17 @@ jobs:
           git config --global user.name "$(get_last_github_author_name)"
           echo "commits: ${commits}"
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v6
         with:
-          node-version: 16.x
-          cache: "yarn"
+          node-version: '24'
+          cache: 'yarn'
 
       - name: Install project dependencies
         run: yarn install
       - run: yarn build
       - uses: undergroundwires/bump-everywhere@master
         with:
-          commit-message: "chore(release): ⬆️ bump version to {{ version }}"
+          commit-message: 'chore(release): ⬆️ bump version to {{ version }}'
           git-token: ${{ secrets.GITHUB_TOKEN }}
-          release-type: "release"
+          release-type: 'release'
           release-token: ${{ secrets.RELEASE_TOKEN }}

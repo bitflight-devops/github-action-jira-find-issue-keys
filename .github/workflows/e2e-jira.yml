@@ -1,0 +1,44 @@
+name: Jira Integration E2E
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  jira-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.19.0'
+      - name: Install from the lockfile
+        run: node .yarn/releases/yarn-3.3.0.cjs install --immutable
+      - name: Build packaged action
+        run: node .yarn/releases/yarn-3.3.0.cjs build
+      - name: Reject stale committed action bundle
+        run: git diff --exit-code -- lib
+      - name: Prepare disposable Jira
+        id: jira
+        uses: bitflight-devops/github-action-jira-transition-manager/e2e/jira@2d455e060b3211672465c1412a891347ed342000
+      - name: Verify packaged action against real Jira
+        run: node .yarn/releases/yarn-3.3.0.cjs test:e2e:jira
+      - name: Collect Jira diagnostics
+        if: failure() && env.JIRA_E2E_HARNESS != ''
+        run: node "$JIRA_E2E_HARNESS" logs
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: jira-enrichment-diagnostics
+          path: ${{ runner.temp }}/jira-e2e/artifacts
+          retention-days: 7
+      - name: Remove disposable environment
+        if: always() && env.JIRA_E2E_HARNESS != ''
+        run: node "$JIRA_E2E_HARNESS" down

@@ -35,7 +35,7 @@ import startsWith from 'lodash/startsWith';
 import toUpper from 'lodash/toUpper';
 import trim from 'lodash/trim';
 import uniq from 'lodash/uniq';
-import { ok, Result } from 'neverthrow';
+import { err, ok, Result } from 'neverthrow';
 
 interface CommitHistory extends GitObject {
   history?: Maybe<CommitHistoryConnection>;
@@ -110,7 +110,7 @@ export default class EventManager {
 
   filter: ProjectFilter;
 
-  jira: Jira;
+  jira?: Jira;
 
   jiraIssueKeysList: string[] = [];
 
@@ -130,43 +130,22 @@ export default class EventManager {
 
   graphqlWithAuth: graphqlType;
 
-  octokit: OctokitInstance;
+  private octokitInstance?: OctokitInstance;
 
   argv: Arguments;
 
-  constructor(context: Context, jira: Jira, argv: Arguments) {
+  constructor(context: Context, jira: Jira | undefined, argv: Arguments) {
     JiraIssueObject.setJira(jira);
     this.jira = jira;
     this.argv = argv;
     this.graphqlWithAuth = graphql.defaults({
       baseUrl: argv.githubApiBaseUrl,
-      headers: {
-        authorization: `token ${argv.token}`,
-      },
+      headers: argv.token ? { authorization: `token ${argv.token}` } : {},
     });
-    if (argv.octokit) {
-      this.octokit = argv.octokit;
-    } else if (argv.githubApiBaseUrl && argv.githubApiBaseUrl.length > 0) {
-      logger.notice(`Using custom GitHub API base URL ${argv.githubApiBaseUrl} and logging in to an Enterprise Server`);
-      this.octokit = createEnterpriseOctokit(
-        argv.enterpriseServerVersion as keyof EnterpriseServerVersions,
-        argv.token,
-        {
-          baseUrl: argv.githubApiBaseUrl,
-        },
-      );
-    } else {
-      this.octokit = createOctokit(argv.token);
-    }
+    this.octokitInstance = argv.octokit;
 
     this.context = context;
     this.failOnError = argv.failOnError;
-    assignReferences(context, argv, this.octokit)
-      .then((references) => {
-        this.refRange = references;
-        return this.refRange;
-      })
-      .catch((error) => logger.error(error));
     this.ignoreCommits = argv.ignoreCommits;
     this.includeMergeMessages = argv.includeMergeMessages;
     this.rawString = argv.string;
@@ -174,6 +153,21 @@ export default class EventManager {
       projectsIncluded: map(compact(split(argv.projects, ',')), (index: string) => toUpper(trim(index))),
       projectsExcluded: map(compact(split(argv.projectsIgnore, ',')), (index: string) => toUpper(trim(index))),
     };
+  }
+
+  get octokit(): OctokitInstance {
+    if (!this.octokitInstance) {
+      if (!this.argv.token)
+        throw new ActionError('A GitHub token is required to read commits or update a pull request');
+      this.octokitInstance = this.argv.githubApiBaseUrl
+        ? createEnterpriseOctokit(
+            (this.argv.enterpriseServerVersion || '3.5') as keyof EnterpriseServerVersions,
+            this.argv.token,
+            { baseUrl: this.argv.githubApiBaseUrl },
+          )
+        : createOctokit(this.argv.token);
+    }
+    return this.octokitInstance;
   }
 
   isProjectOfIssueSelected(issueKey?: string): boolean {
@@ -251,94 +245,125 @@ export default class EventManager {
   }
 
   async getJiraKeysFromGitRange(): Promise<Result<Set<string>, ActionError>> {
-    const providedStringArray: string[] = this.getIssuesFromString(this.rawString);
-    if (this.rawString) {
-      logger.debug(`Raw string provided is: ${this.rawString}`);
-      setOutput('string_issues', EventManager.setToCommaDelimitedString(providedStringArray));
+    const source = this.argv.from || 'commits';
+    if (!includes(['all', 'string', 'branch', 'pull_request', 'commits'], source)) {
+      return err(new ActionError(`Unsupported issue source: ${source}`));
     }
-    const titleArray: string[] = this.getIssuesFromString(this.context.payload?.pull_request?.title);
-    if (includes(this.context.eventName, 'pull_request')) {
-      logger.debug(`Pull request title is: ${this.context.payload?.pull_request?.title}`);
-      setOutput('title_issues', EventManager.setToCommaDelimitedString(titleArray));
-    }
-    const combinedArray: string[] = [];
-    if (this.refRange && this.refRange.baseRef && this.refRange.headRef) {
-      const refDetails = this.refRange
-        ? `, Head Ref: ${this.refRange?.headRef}, Base Ref: ${this.refRange?.baseRef}`
-        : '';
-      logger.info(`EventName: ${this.context.eventName}${refDetails}`);
-      logger.info(
-        `getJiraKeysFromGitRange: Getting list of github commits between ${this.refRange?.baseRef} and ${this.refRange?.headRef}`,
-      );
-      const referenceArray: string[] = this.getIssuesFromString(this.refRange.headRef);
-      setOutput('ref_issues', EventManager.setToCommaDelimitedString(referenceArray));
-      combinedArray.push(...referenceArray);
+    const providedStringArray = source === 'string' || source === 'all' ? this.getIssuesFromString(this.rawString) : [];
+    const titleArray =
+      source === 'pull_request' || source === 'all'
+        ? this.getIssuesFromString(this.context.payload?.pull_request?.title)
+        : [];
+    const headRef = this.argv.headRef || this.context.payload?.pull_request?.head?.ref || this.context.ref;
+    const referenceArray =
+      source === 'branch' || source === 'all' ? this.getIssuesFromString(replace(headRef || '', /\//g, ' ')) : [];
+    const commitSet = new Set<string>();
 
-      const commitSet = new Set<string>();
-      let after: string | null = null;
+    if ((source === 'commits' || source === 'all') && !this.ignoreCommits) {
       try {
-        if (!this.ignoreCommits) {
-          let hasNextPage = !!this.context.payload?.pull_request?.number;
-
+        if (this.context.payload.pull_request) {
+          if (!this.argv.token) throw new ActionError('A GitHub token is required to read pull request commits');
+          let after: string | null = null;
+          let hasNextPage = true;
           while (hasNextPage) {
             // eslint-disable-next-line no-await-in-loop
-            const { repository } = await this.graphqlWithAuth<{ repository: Repository }>(
+            const response: { repository: Repository } = await this.graphqlWithAuth<{ repository: Repository }>(
               listCommitMessagesInPullRequest,
-              {
-                owner: this.context.repo.owner,
-                repo: this.context.repo.repo,
-                prNumber: this.context.payload?.pull_request?.number,
-                after,
-              },
+              { ...this.context.repo, prNumber: this.context.payload.pull_request.number, after },
             );
-            if ((repository?.pullRequest?.commits?.totalCount as number) === 0) {
-              hasNextPage = false;
-            } else {
-              hasNextPage = repository?.pullRequest?.commits?.pageInfo.hasNextPage as boolean;
-              after = repository?.pullRequest?.commits?.pageInfo.endCursor as string | null;
-              if (repository?.pullRequest?.commits?.nodes) {
-                // eslint-disable-next-line no-await-in-loop
-                for (const commitNode of repository.pullRequest.commits.nodes) {
-                  if (commitNode) {
-                    let skipCommit = false;
-                    const m = commitNode.commit.message;
-                    if (startsWith(m, 'Merge branch') || startsWith(m, 'Merge pull')) {
-                      logger.debug('Commit message indicates that it is a merge');
-                      if (!this.includeMergeMessages) {
-                        skipCommit = true;
-                      }
-                    }
-                    if (skipCommit === false) {
-                      this.getIssuesFromString(commitNode.commit.message, commitSet);
-                    }
-                  }
-                }
-              }
+            const commits: NonNullable<Repository['pullRequest']>['commits'] | undefined =
+              response.repository?.pullRequest?.commits;
+            if (!commits) throw new ActionError('GitHub did not return pull request commits');
+            for (const node of commits.nodes || []) {
+              if (node) this.addCommitIssues(node.commit.message, commitSet);
+            }
+            hasNextPage = commits.pageInfo.hasNextPage;
+            const nextCursor = commits.pageInfo.endCursor || null;
+            if (hasNextPage && (!nextCursor || nextCursor === after)) {
+              throw new ActionError('GitHub returned a missing or repeated commit pagination cursor');
+            }
+            after = nextCursor;
+          }
+        } else {
+          if (this.argv.baseRef || this.context.payload.before) {
+            this.refRange = {
+              baseRef: this.argv.baseRef || this.context.payload.before,
+              headRef: this.argv.headRef || this.context.payload.after || this.context.ref,
+            };
+          } else if (this.context.payload.commits || this.context.payload.deleted) {
+            this.refRange = {};
+          } else {
+            this.refRange = await assignReferences(this.context, this.argv, this.octokit);
+          }
+          const base = this.argv.baseRef || this.context.payload.before || this.refRange.baseRef;
+          const head = this.argv.headRef || this.context.payload.after || this.refRange.headRef;
+          if (this.context.payload.deleted || (head && /^0+$/.test(head))) {
+            logger.info('The branch was deleted; there are no new commit messages to inspect');
+          } else if (base && head && base !== head && !/^0+$/.test(base)) {
+            let page = 1;
+            let hasNextPage = true;
+            while (hasNextPage) {
+              // eslint-disable-next-line no-await-in-loop
+              const { data } = await this.octokit.rest.repos.compareCommitsWithBasehead({
+                ...this.context.repo,
+                basehead: `${base}...${head}`,
+                per_page: 100,
+                page,
+              });
+              for (const commit of data.commits) this.addCommitIssues(commit.commit.message, commitSet);
+              hasNextPage = data.commits.length === 100;
+              page += 1;
+            }
+          } else {
+            for (const commit of this.context.payload.commits || []) {
+              this.addCommitIssues(commit.message, commitSet);
             }
           }
-
-          setOutput('commit_issues', EventManager.setToCommaDelimitedString(commitSet));
-          combinedArray.push(...commitSet);
         }
       } catch (error) {
-        new ActionError(`getJiraKeysFromGitRange:`, error).logError();
+        return err(new ActionError('Failed to collect commit messages', error));
       }
     }
 
-    const combinedSet = new Set<string>([...providedStringArray, ...titleArray, ...combinedArray]);
+    const selected = {
+      string: providedStringArray,
+      branch: referenceArray,
+      pull_request: titleArray,
+      commits: [...commitSet],
+      all: [...providedStringArray, ...titleArray, ...referenceArray, ...commitSet],
+    };
+    const combinedSet = new Set<string>(selected[source as keyof typeof selected]);
     this.jiraIssueKeysList = [...combinedSet];
-    const projectsSet: Set<string> = EventManager.getProjectsFromIssuesSet(combinedSet);
+    if (this.context.payload.pull_request && this.argv.update_pull_request) {
+      try {
+        this.jiraIssueArray = await Promise.all(
+          map(this.jiraIssueKeysList, async (issueKey) => JiraIssueObject.create(issueKey, this.jira, true, true)),
+        );
+        await this.updatePullRequestBody();
+      } catch (error) {
+        return err(new ActionError('Failed to enrich Jira issues or update the pull request', error));
+      }
+    }
+    setOutput('string_issues', EventManager.setToCommaDelimitedString(providedStringArray));
+    setOutput('title_issues', EventManager.setToCommaDelimitedString(titleArray));
+    setOutput('ref_issues', EventManager.setToCommaDelimitedString(referenceArray));
+    setOutput('commit_issues', EventManager.setToCommaDelimitedString(commitSet));
     setOutput('issues', EventManager.setToCommaDelimitedString(combinedSet));
     setOutput('issue', combinedSet.size > 0 ? combinedSet.values().next().value : '');
-    setOutput('projects_excluded', this.filter.projectsExcluded);
-    setOutput('projects_included', this.filter.projectsIncluded);
-    setOutput('projects_found', EventManager.setToCommaDelimitedString(projectsSet));
-    if (this.context.payload.pull_request) {
-      const issueListPromises = map(this.jiraIssueKeysList, async (issueKey) => JiraIssueObject.create(issueKey));
-      this.jiraIssueArray = await Promise.all(issueListPromises);
-      this.updatePullRequestBody();
-    }
+    setOutput('projects_excluded', EventManager.setToCommaDelimitedString(this.filter.projectsExcluded));
+    setOutput('projects_included', EventManager.setToCommaDelimitedString(this.filter.projectsIncluded));
+    setOutput(
+      'projects_found',
+      EventManager.setToCommaDelimitedString(EventManager.getProjectsFromIssuesSet(combinedSet)),
+    );
     return ok(combinedSet);
+  }
+
+  private addCommitIssues(message: string, issues: Set<string>): void {
+    if (!this.includeMergeMessages && (startsWith(message, 'Merge branch') || startsWith(message, 'Merge pull'))) {
+      return;
+    }
+    this.getIssuesFromString(message, issues);
   }
 
   formattedIssueList(jiraIssuesListProvided?: JiraIssueObject[]): string[] {
@@ -346,7 +371,7 @@ export default class EventManager {
     if (jiraIssuesList && jiraIssuesList.length > 0) {
       return map(jiraIssuesList, (a) => {
         const ghFix = a?.ghNumber ? ` (Fix: # ${a.ghNumber})` : '';
-        return `*  **[${a?.key}](${this.jira.baseUrl}/browse/${a?.key ?? 'unknown'})** [${
+        return `*  **[${a?.key}](${this.jira?.baseUrl}/browse/${a?.key ?? 'unknown'})** [${
           a?.status ?? 'Jira Status Unknown'
         }] ${a?.summary ?? 'unknown'}${ghFix}`;
       });
@@ -371,7 +396,7 @@ export default class EventManager {
     );
 
     if (regex.test(fullText)) {
-      return replace(fullText, regex, `$1${insertText}$3`);
+      return replace(fullText, regex, (_match, start, _text, end) => `${start}${insertText}${end}`);
     }
 
     return `${trim(fullText)}\n\n[/]: / "${startToken}"\n${insertText}\n[/]: / "${endToken}"`;
@@ -396,7 +421,7 @@ export default class EventManager {
       return;
     }
     const issues = this.formattedIssueList(jiraIssuesList);
-    const text = `### Linked Jira Issues:\n\n${issues}\n`;
+    const text = `### Linked Jira Issues:\n\n${join(issues, '\n')}\n`;
 
     const { number: pr_number, body, title } = this.context.payload.pull_request;
 
@@ -404,6 +429,7 @@ export default class EventManager {
     logger.debug(`With text:\n ${text}`);
 
     let newTitle = trim(title);
+    let titleOutput: string | undefined;
 
     if (this.argv.update_pull_request) {
       logger.debug(`Current PR Title: ${title}`);
@@ -420,7 +446,7 @@ export default class EventManager {
             const titleString = TitleCasePipe(replace(trim(groups.title), /\s+/g, ' '));
             newTitle = `${join(issueKeys, ',')}: ${titleString}`.slice(0, 71);
             logger.debug(`Revised PR Title: ${newTitle}`);
-            setOutput('title', `${titleString}`);
+            titleOutput = titleString ?? '';
           }
         } catch (error) {
           if (isNodeError(error)) {
@@ -433,12 +459,14 @@ export default class EventManager {
       if (issues.length > 0) {
         const bodyUpdate = EventManager.updateStringByToken(startToken, endToken, body ?? '', text);
 
-        return this.octokit.rest.pulls.update({
+        const updated = await this.octokit.rest.pulls.update({
           ...this.context.repo,
           title: newTitle,
           body: bodyUpdate,
           pull_number: pr_number,
         });
+        if (titleOutput !== undefined) setOutput('title', titleOutput);
+        return updated;
       }
     }
   }
