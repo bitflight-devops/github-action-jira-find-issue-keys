@@ -27,6 +27,8 @@ jobs:
         uses: docker://rhysd/actionlint:1.7.12
       - name: Unit tests
         run: node .yarn/releases/yarn-3.3.0.cjs test:ci --runInBand
+      - name: Release safety regression tests
+        run: node .yarn/releases/yarn-3.3.0.cjs test:release
       - name: Type check and build packaged action
         run: node .yarn/releases/yarn-3.3.0.cjs build
       - name: Verify committed bundle

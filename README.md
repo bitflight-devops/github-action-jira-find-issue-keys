@@ -53,6 +53,7 @@ node .yarn/releases/yarn-3.3.0.cjs lint:source
 node .yarn/releases/yarn-3.3.0.cjs test:ci --runInBand
 node .yarn/releases/yarn-3.3.0.cjs build
 node .yarn/releases/yarn-3.3.0.cjs test:packaged
+node .yarn/releases/yarn-3.3.0.cjs test:release
 ```
 
 CI also runs actionlint 1.7.12 and checks that rebuilding leaves the committed `lib/` bundle unchanged. The bundle targets Node 24 and retains source maps without embedded dependency source text. Commit the rebuilt bundle with source changes.
@@ -67,6 +68,8 @@ E2E_JIRA_BASE_URL=http://127.0.0.1:8080 \
 ```
 
 `E2E_JIRA_USERNAME` and `E2E_JIRA_PASSWORD` default to `admin`; `E2E_JIRA_PROJECT` defaults to `E2E`. The test creates its own Jira issue, executes the packaged action against real Jira and a local GitHub HTTP fixture, checks the completed PR update's real summary/status/link, deletes the issue, and verifies that a subsequent Jira 404 fails the action without updating GitHub. It cleans up its issue on failure. This lane validates Data Center behavior; it does not emulate Jira Cloud Enterprise.
+
+The release workflow starts after successful Jira E2E testing of a push to `main`. It checks that the tested revision is still current, repeats the strict build and test gates, and prepares only version and documentation changes. The next release increments the patch component after the highest stable package version or existing `vX.Y.Z` tag. It publishes the metadata commit and its exact tag in one atomic push, then creates the GitHub release. It uses `GITHUB_TOKEN`; repository rules that prevent the push cause the workflow to fail.
 
 ## GitHub Action Inputs
 

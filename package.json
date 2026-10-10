@@ -50,7 +50,8 @@
     "tsc": "yarn exec tsc --project tsconfig.json",
     "lint:source": "eslint -c .eslintrc.cjs --max-warnings=0 ./src/ ./__tests__/",
     "test:packaged": "node --test e2e/packaged.test.cjs",
-    "test:e2e:jira": "node .github/scripts/e2e-jira.cjs"
+    "test:e2e:jira": "node .github/scripts/e2e-jira.cjs",
+    "test:release": "node --test .github/scripts/release.test.cjs"
   },
   "config": {
     "commitizen": {

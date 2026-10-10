@@ -27,7 +27,7 @@ jobs:
         run: git diff --exit-code -- lib
       - name: Prepare disposable Jira
         id: jira
-        uses: bitflight-devops/github-action-jira-transition-manager/e2e/jira@2d455e060b3211672465c1412a891347ed342000
+        uses: bitflight-devops/github-action-jira-transition-manager/e2e/jira@4e95d80b6115ef60f14bc7c351a23c6ae5f06da5
       - name: Verify packaged action against real Jira
         run: node .yarn/releases/yarn-3.3.0.cjs test:e2e:jira
       - name: Collect Jira diagnostics
