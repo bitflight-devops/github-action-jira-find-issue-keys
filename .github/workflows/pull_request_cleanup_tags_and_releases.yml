@@ -1,41 +1,49 @@
-name: 🧼 Pull Request - Cleanup Tags and Releases
+name: Clean up a controlled test release
 
 on:
-  delete:
-  pull_request:
-    types: [closed]
   workflow_dispatch:
     inputs:
-      regex:
-        description: 'Regex to search by'
-        required: false
-      pr_number:
-        description: 'PR Number to search by'
-        required: false
+      tag:
+        description: 'Exact test tag: vMAJOR.MINOR.PATCH-repair.RUN.ATTEMPT'
+        required: true
+        type: string
+      expected_sha:
+        description: 'Full commit SHA recorded when the test release was created'
+        required: true
+        type: string
+
+permissions:
+  contents: write
 
 concurrency:
-  group: ${{ github.workflow }}${{ github.event_name }}${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  group: cleanup-test-release-${{ inputs.tag }}
+  cancel-in-progress: false
 
 jobs:
   cleanup:
-    name: Cleanup Tags and Releases
     runs-on: ubuntu-24.04
     steps:
-      - name: Remove unused releases and tags
-        uses: Broadshield/github-action-cleanup-releases-and-tags@main
+      - name: Validate ownership and delete only the named test release and tag
+        uses: actions/github-script@v8
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          TEST_TAG: ${{ inputs.tag }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
         with:
-          regex: ${{ github.event.inputs.regex }}
-          pr_number: ${{ github.event.inputs.pr_number }}
-
-      - name: Delete workflow runs
-        uses: MajorScruffy/delete-workflow-runs@v0.1.0
-        id: delete-workflow-runs
-        with:
-          what-if: 'false'
-          repository: ${{ github.repository }}
-          older-than-seconds: 604800 # remove all workflow runs older than 7 days
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const tag = process.env.TEST_TAG;
+            const expected = process.env.EXPECTED_SHA;
+            if (!/^v[0-9]+\.[0-9]+\.[0-9]+-repair\.[0-9]+\.[0-9]+$/.test(tag)) {
+              throw new Error('Only explicitly named repair test tags can be removed.');
+            }
+            if (!/^[a-f0-9]{40}$/.test(expected)) {
+              throw new Error('The expected full commit SHA is required.');
+            }
+            const { data: commit } = await github.rest.repos.getCommit({ ...context.repo, ref: tag });
+            if (commit.sha !== expected) throw new Error('Test tag does not target the expected commit.');
+            const { data: release } = await github.rest.repos.getReleaseByTag({ ...context.repo, tag });
+            if (release.tag_name !== tag || !release.prerelease) {
+              throw new Error('The named release must be a prerelease.');
+            }
+            await github.rest.repos.deleteRelease({ ...context.repo, release_id: release.id });
+            await github.rest.git.deleteRef({ ...context.repo, ref: `tags/${tag}` });
+            core.info(`Deleted controlled test release ${tag} at ${expected}.`);
