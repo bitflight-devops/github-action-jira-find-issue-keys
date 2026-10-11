@@ -1,14 +1,42 @@
-name: publish-action
+name: Verify published action
 
 on:
   push:
     tags:
-      - '**'
+      - 'v*'
+      - '!v*-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  release:
-    name: Release GitHub Actions
-    runs-on: ubuntu-latest
+  verify:
+    runs-on: ubuntu-24.04
     steps:
-      - name: Release GitHub Actions
-        uses: technote-space/release-github-actions@v7.0.5
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.19.0'
+      - name: Verify immutable tag, version, release notes and packaged entry point
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const fs = require('node:fs');
+            const { execFileSync } = require('node:child_process');
+            const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+            assert.ok(context.ref.startsWith('refs/tags/'), 'Select an immutable version tag');
+            const tag = context.ref.slice('refs/tags/'.length);
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            assert.equal(tag, `v${pkg.version}`);
+            assert.ok(fs.statSync('lib/index.js').size > 0);
+            const { data: commit } = await github.rest.repos.getCommit({ ...context.repo, ref: tag });
+            const { data: release } = await github.rest.repos.getReleaseByTag({ ...context.repo, tag });
+            assert.equal(commit.sha, sha);
+            assert.equal(release.tag_name, tag);
+            assert.equal(release.draft, false);
+            assert.ok(release.body?.trim(), 'Published release notes are required');
+            core.info(`Verified ${tag} at ${sha}; packaged action is present.`);
