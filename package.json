@@ -39,7 +39,6 @@
     "lint:markdown": "yarn exec markdownlint \"**/*.md\" --config=.markdownlint.json --ignore-path=.markdownlintignore",
     "lint:markdown:fix": "yarn lint:markdown --fix",
     "package": "yarn run build",
-    "postversion": "echo 'Running post versioning commands';git add . && git commit -m 'update package version' && git push --tags -f && git push && echo \"Successfully released version $npm_package_version!\"",
     "preadd": "yarn run format:quick",
     "precommit": "yarn run lint:fix && yarn run build && git add lib && yarn run generate-docs",
     "prepush": "yarn run format",

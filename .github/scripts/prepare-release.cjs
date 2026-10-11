@@ -57,8 +57,8 @@ function prepareRelease() {
   const tag = `v${version}`;
   assert.equal(git('tag', '--list', tag), '', `Release tag ${tag} already exists`);
 
-  // Yarn 3 does not use Yarn Classic's version lifecycle. Updating JSON directly
-  // also avoids this repository's legacy postversion script, which pushes tags.
+  // Yarn 3 does not use Yarn Classic's version lifecycle. Update metadata here;
+  // the release workflow owns publication after validating the prepared commit.
   writeFileSync('package.json', `${JSON.stringify({ ...original, version }, null, 2)}\n`);
   execFileSync(process.execPath, ['.yarn/releases/yarn-3.3.0.cjs', 'generate-docs'], { stdio: 'inherit' });
   assert.deepEqual(JSON.parse(readFileSync('package.json', 'utf8')), { ...original, version });
