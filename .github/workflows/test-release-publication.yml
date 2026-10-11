@@ -1,0 +1,91 @@
+name: Controlled release publication test
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pull_request_cleanup_tags_and_releases.yml'
+      - '.github/workflows/test-release-publication.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.publish.outputs.tag }}
+      sha: ${{ steps.publish.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Package the exact checked-out action
+        run: git archive --format=tar.gz --output=action.tar.gz HEAD action.yml lib package.json README.md LICENSE
+      - name: Publish a unique prerelease without moving any existing ref
+        id: publish
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('node:fs');
+            const { execFileSync } = require('node:child_process');
+            const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+            const version = JSON.parse(fs.readFileSync('package.json', 'utf8')).version;
+            const tag = `v${version}-repair.${context.runId}.${process.env.GITHUB_RUN_ATTEMPT}`;
+            // createRef rejects an existing tag; this workflow never updates refs.
+            await github.rest.git.createRef({ ...context.repo, ref: `refs/tags/${tag}`, sha });
+            core.setOutput('tag', tag);
+            core.setOutput('sha', sha);
+            const { data: release } = await github.rest.repos.createRelease({
+              ...context.repo, tag_name: tag, target_commitish: sha,
+              name: `Controlled publication test ${tag}`, prerelease: true, make_latest: 'false',
+              body: `Disposable publication verification for commit ${sha}.`,
+            });
+            await github.rest.repos.uploadReleaseAsset({
+              ...context.repo, release_id: release.id, name: 'action.tar.gz',
+              data: fs.readFileSync('action.tar.gz'),
+            });
+            const { data: commit } = await github.rest.repos.getCommit({ ...context.repo, ref: tag });
+            const { data: published } = await github.rest.repos.getReleaseByTag({ ...context.repo, tag });
+            if (commit.sha !== sha || published.draft || !published.prerelease ||
+                published.tag_name !== tag || !published.body.includes(sha) ||
+                published.assets.length !== 1 || published.assets[0].name !== 'action.tar.gz') {
+              throw new Error('Published test release differs from the requested artifact and revision.');
+            }
+      - name: Verify the published artifact byte for byte
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TEST_TAG: ${{ steps.publish.outputs.tag }}
+        run: |
+          gh release download "$TEST_TAG" --repo "$GITHUB_REPOSITORY" --pattern action.tar.gz --dir downloaded
+          cmp action.tar.gz downloaded/action.tar.gz
+
+  cleanup:
+    if: always() && needs.publish.outputs.tag != ''
+    needs: publish
+    uses: ./.github/workflows/pull_request_cleanup_tags_and_releases.yml
+    with:
+      tag: ${{ needs.publish.outputs.tag }}
+      expected_sha: ${{ needs.publish.outputs.sha }}
+
+  verify-cleanup:
+    needs: [publish, cleanup]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/github-script@v8
+        env:
+          TEST_TAG: ${{ needs.publish.outputs.tag }}
+        with:
+          script: |
+            const tag = process.env.TEST_TAG;
+            for (const lookup of [
+              () => github.rest.repos.getReleaseByTag({ ...context.repo, tag }),
+              () => github.rest.git.getRef({ ...context.repo, ref: `tags/${tag}` }),
+            ]) {
+              try { await lookup(); }
+              catch (error) { if (error.status === 404) continue; throw error; }
+              throw new Error(`Controlled test artifact ${tag} remains after cleanup.`);
+            }
+            core.info(`Verified exact test release and tag ${tag} are absent.`);

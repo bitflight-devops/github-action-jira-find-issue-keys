@@ -136,3 +136,27 @@ jobs:
               });
               core.info(`Created release ${tag}.`);
             }
+
+  verify-release:
+    name: Start verification on the published commit
+    needs: [tag, release]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/github-script@v8
+        env:
+          RELEASE_TAG: ${{ needs.tag.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.tag.outputs.commit }}
+        with:
+          script: |
+            const tag = process.env.RELEASE_TAG;
+            const { data: commit } = await github.rest.repos.getCommit({ ...context.repo, ref: tag });
+            if (commit.sha !== process.env.RELEASE_COMMIT) throw new Error('Published tag target changed.');
+            // GITHUB_TOKEN pushes do not start push workflows; explicit dispatch does.
+            // Dispatch against the immutable tag so checks belong to the release commit.
+            for (const workflow_id of ['push_code_linting.yml', 'find-issue-key.yml', 'e2e-jira.yml', 'codeql-analysis.yml', 'publish_action.yml']) {
+              await github.rest.actions.createWorkflowDispatch({ ...context.repo, workflow_id, ref: tag });
+              core.info(`Dispatched ${workflow_id} for ${tag} (${commit.sha}).`);
+            }
