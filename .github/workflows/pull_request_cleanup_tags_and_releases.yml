@@ -1,6 +1,14 @@
 name: Clean up a controlled test release
 
 on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      expected_sha:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:
@@ -38,12 +46,19 @@ jobs:
             if (!/^[a-f0-9]{40}$/.test(expected)) {
               throw new Error('The expected full commit SHA is required.');
             }
-            const { data: commit } = await github.rest.repos.getCommit({ ...context.repo, ref: tag });
-            if (commit.sha !== expected) throw new Error('Test tag does not target the expected commit.');
-            const { data: release } = await github.rest.repos.getReleaseByTag({ ...context.repo, tag });
-            if (release.tag_name !== tag || !release.prerelease) {
+            const absentOn404 = async (request) => {
+              try { return (await request()).data; }
+              catch (error) { if (error.status === 404) return null; throw error; }
+            };
+            const commit = await absentOn404(() => github.rest.repos.getCommit({ ...context.repo, ref: tag }));
+            const release = await absentOn404(() => github.rest.repos.getReleaseByTag({ ...context.repo, tag }));
+            if (commit && commit.sha !== expected) throw new Error('Test tag does not target the expected commit.');
+            if (release && (release.tag_name !== tag || !release.prerelease)) {
               throw new Error('The named release must be a prerelease.');
             }
-            await github.rest.repos.deleteRelease({ ...context.repo, release_id: release.id });
-            await github.rest.git.deleteRef({ ...context.repo, ref: `tags/${tag}` });
+            if (release && !commit && release.target_commitish !== expected) {
+              throw new Error('Cannot verify the target of a release whose tag is missing.');
+            }
+            if (release) await github.rest.repos.deleteRelease({ ...context.repo, release_id: release.id });
+            if (commit) await github.rest.git.deleteRef({ ...context.repo, ref: `tags/${tag}` });
             core.info(`Deleted controlled test release ${tag} at ${expected}.`);
